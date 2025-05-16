@@ -1472,6 +1472,9 @@ webconfig_error_t translate_beacon_report_object_to_easymesh_sta_info(webconfig_
     int vap_index = 0, radio_index = 0;
     wifi_platform_property_t *wifi_prop;
     webconfig_subdoc_decoded_data_t *params = &data->u.decoded;
+    rdk_wifi_radio_t *radio = NULL;
+    wifi_vap_info_t *vap = NULL;
+    wifi_vap_info_map_t *vap_map = NULL;
 
     if (params == NULL) {
         wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: decoded_params is NULL\n", __func__,
@@ -1489,12 +1492,31 @@ webconfig_error_t translate_beacon_report_object_to_easymesh_sta_info(webconfig_
         return webconfig_error_translate_to_easymesh;
     }
 
-    radio_info = proto->get_radio_info(proto->data_model, radio_index);
-    bss_info = proto->get_bss_info(proto->data_model, vap_index);
+    radio = &params->radios[radio_index];
+    vap_map = &radio->vaps.vap_map;
+
+    for (i = 0; i < radio->vaps.num_vaps; i++) {
+        vap = &vap_map->vap_array[j];
+        if (vap->vap_index == vap_index) {
+            break;
+        }
+    }
+
+    if (vap == NULL){
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: vap is NULL\n", __func__,
+            __LINE__);
+    }
+
+    bss_info = proto->get_bss_info_with_mac(proto->data_model, vap->u.bss_info.bssid);
+
+    if (bss_info == NULL) {
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: bss_info is NULL\n", __func__,
+            __LINE__);
+    }
 
     memcpy(em_sta_dev_info.id, params->sta_beacon_report.mac_addr, sizeof(mac_address_t));
     memcpy(em_sta_dev_info.bssid, bss_info->bssid.mac, sizeof(mac_address_t));
-    memcpy(em_sta_dev_info.radiomac, radio_info->intf.mac, sizeof(mac_address_t));
+    memcpy(em_sta_dev_info.radiomac, bss_info->ruid.mac, sizeof(mac_address_t));
     em_sta_dev_info.beacon_report_len = params->sta_beacon_report.data_len;
     em_sta_dev_info.num_beacon_meas_report = params->sta_beacon_report.num_br_data;
 

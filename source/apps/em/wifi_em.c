@@ -2062,6 +2062,7 @@ static int em_beacon_report_publish(bus_handle_t *handle, void *msg_data)
     wifi_ctrl_t *ctrl = NULL;
     raw_data_t p_data;
     wifi_mgr_t *mgr = NULL;
+    unsigned int i = 0;
 
     if (msg_data == NULL) {
         wifi_util_error_print(WIFI_EM, "%s %d NULL pointer \n", __func__, __LINE__);
@@ -2083,6 +2084,10 @@ static int em_beacon_report_publish(bus_handle_t *handle, void *msg_data)
     ctrl = (wifi_ctrl_t *)get_wifictrl_obj();
 
     wb_data->u.decoded.hal_cap = mgr->hal_cap;
+    for (i = 0; i < getNumberRadios(); i++){
+        wb_data->u.decoded.radios[i] = mgr->radio_config[i];
+    }
+
     if (webconfig_encode(&ctrl->webconfig, wb_data, webconfig_subdoc_type_beacon_report) !=
         webconfig_error_none) {
         wifi_util_error_print(WIFI_CTRL, "%s:%d: Webconfig set failed\n", __func__, __LINE__);
