@@ -1475,6 +1475,7 @@ webconfig_error_t translate_beacon_report_object_to_easymesh_sta_info(webconfig_
     rdk_wifi_radio_t *radio = NULL;
     wifi_vap_info_t *vap = NULL;
     wifi_vap_info_map_t *vap_map = NULL;
+    int i = 0, j = 0;
 
     if (params == NULL) {
         wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: decoded_params is NULL\n", __func__,
@@ -1496,7 +1497,7 @@ webconfig_error_t translate_beacon_report_object_to_easymesh_sta_info(webconfig_
     vap_map = &radio->vaps.vap_map;
 
     for (i = 0; i < radio->vaps.num_vaps; i++) {
-        vap = &vap_map->vap_array[j];
+        vap = &vap_map->vap_array[i];
         if (vap->vap_index == vap_index) {
             break;
         }
