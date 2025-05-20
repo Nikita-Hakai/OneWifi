@@ -34,7 +34,7 @@ struct element {
     uint8_t data[];
 } __attribute__((packed));
 
-#define TEST_CODE 1
+//#define TEST_CODE 1
 #if TEST_CODE
 //TODO: Test Data, remove later
 unsigned int g_sched_id;
