@@ -3059,12 +3059,15 @@ webconfig_error_t encode_em_ap_metrics_report_object(rdk_wifi_radio_t *radio,
             if (strncmp(vap->u.bss_info.bssid, ap_metrics->vap_metrics.bssid,
                 sizeof(bssid_t)) == 0) {
                     vap_arr_index = k;
+                    
                     break;
             }
         }
         if(vap_arr_index == -1) {
             continue;
         }
+        
+        wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d vap_arr_index: %d\n", __func__, __LINE__, vap_arr_index);
 
         ap_metrics = &ap_report->vap_reports[vap_arr_index];
 
@@ -3085,6 +3088,8 @@ webconfig_error_t encode_em_ap_metrics_report_object(rdk_wifi_radio_t *radio,
         to_mac_str(vap->u.bss_info.bssid, mac_string);
         cJSON_AddStringToObject(temp_obj, "BSSID", mac_string);
         cJSON_AddNumberToObject(temp_obj, "Channel Util", ap_metrics->vap_metrics.channel_util);
+
+        wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d ASSOC STA CNT : %d\n", __func__, __LINE__, ap_metrics->vap_metrics.num_of_assoc_stas);
         cJSON_AddNumberToObject(temp_obj, "Number of Associated STAs",
             ap_metrics->vap_metrics.num_of_assoc_stas);
 
