@@ -428,7 +428,10 @@ static bool sta_mgr_parse_vendor_specific_info(wifi_app_t *app, const uint8_t *p
         marker_len = elen - 4;
         wifi_util_dbg_print(WIFI_APPS, "%s:%d elem is %s \n", __func__, __LINE__,
             hexBytesToString((pos + 4), marker_len, marker));
+        wifi_util_dbg_print(WIFI_APPS, "%s:%d policy marker is %s \n", __func__, __LINE__,
+            hexBytesToString((pos + 4), marker_len, app->data.u.sta_mgr.ap_metrics_policy.managed_client_marker));
         if (strstr(marker, app->data.u.sta_mgr.ap_metrics_policy.managed_client_marker)) {
+             wifi_util_dbg_print(WIFI_APPS, "%s:%d Matcheddddd \n", __func__, __LINE__);
             return true;
         }
     }
@@ -444,6 +447,7 @@ static bool is_marker_present(wifi_app_t *app, const uint8_t *ie, size_t ie_len)
         const u8 *pos = elem->data;
         // Parse VENDOR specific info and check for marker.
         if (sta_mgr_parse_vendor_specific_info(app, pos, elen, elem)) {
+            wifi_util_dbg_print(WIFI_APPS, "%s:%d Jayanthhhh gahori \n", __func__, __LINE__);
             return true;
         }
     }
@@ -469,6 +473,7 @@ void sta_mgr_handle_assoc_req(wifi_app_t *app, void *arg)
             memset(t_sta_data, 0, sizeof(sta_beacon_report_reponse_t));
             memcpy(t_sta_data->mac_addr, mgmt->sa, sizeof(mac_address_t));
             t_sta_data->ap_index = mgmt_frame->frame.ap_index;
+            wifi_util_dbg_print(WIFI_APPS, "%s:%d GAHORIIIIII \n", __func__, __LINE__);
             hash_map_put(app->data.u.sta_mgr.sta_mgr_map, strdup(client_mac), t_sta_data);
             wifi_util_info_print(WIFI_APPS, "%s:%d: sta_mgr_handle_assoc_req sta pushed to map \n", __func__,
                 __LINE__);
