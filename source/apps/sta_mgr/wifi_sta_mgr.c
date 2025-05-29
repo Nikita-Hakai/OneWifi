@@ -461,7 +461,7 @@ void sta_mgr_handle_assoc_req(wifi_app_t *app, void *arg)
 
     ie = ((const u8 *)mgmt) + ASSOC_REQ_MAC_HEADER_LEN;
     ie_len = len - ASSOC_REQ_MAC_HEADER_LEN;
-    //if (is_marker_present(app, ie, ie_len)) {
+    if (is_marker_present(app, ie, ie_len)) {
         to_mac_str((unsigned char *)mgmt->sa, client_mac);
         if (hash_map_get(app->data.u.sta_mgr.sta_mgr_map, client_mac) == NULL) {
             sta_beacon_report_reponse_t *t_sta_data = (sta_beacon_report_reponse_t *)malloc(
@@ -473,7 +473,7 @@ void sta_mgr_handle_assoc_req(wifi_app_t *app, void *arg)
             wifi_util_info_print(WIFI_APPS, "%s:%d: sta_mgr_handle_assoc_req sta pushed to map \n", __func__,
                 __LINE__);
         }
-    //}
+    }
     return;
 }
 
