@@ -428,8 +428,8 @@ static bool sta_mgr_parse_vendor_specific_info(wifi_app_t *app, const uint8_t *p
         marker_len = elen - 4;
         wifi_util_dbg_print(WIFI_APPS, "%s:%d elem is %s \n", __func__, __LINE__,
             hexBytesToString((pos + 4), marker_len, marker));
-        wifi_util_dbg_print(WIFI_APPS, "%s:%d policy marker is %s \n", __func__, __LINE__,
-            hexBytesToString((pos + 4), marker_len, app->data.u.sta_mgr.ap_metrics_policy.managed_client_marker));
+        wifi_util_dbg_print(WIFI_APPS, "%s:%d marker: %s, policy marker is %s \n", __func__, __LINE__,
+            marker, app->data.u.sta_mgr.ap_metrics_policy.managed_client_marker);
         if (strstr(marker, app->data.u.sta_mgr.ap_metrics_policy.managed_client_marker)) {
              wifi_util_dbg_print(WIFI_APPS, "%s:%d Matcheddddd \n", __func__, __LINE__);
             return true;
