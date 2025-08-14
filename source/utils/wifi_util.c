@@ -27,6 +27,7 @@
 #include "wifi_util.h"
 #include "wifi_ctrl.h"
 #include "wifi_mgr.h"
+#include "services/vap_svc.h"
 #include <netinet/in.h>
 #include <time.h>
 #include <openssl/sha.h>
@@ -184,7 +185,7 @@ struct wifiCountryEnumStrMapMember wifiCountryMapMembers[] =
     {wifi_countrycode_JM,"JM","388"}, /**< JAMAICA */
     {wifi_countrycode_JP,"JP","392"}, /**< JAPAN */
     {wifi_countrycode_JE,"JE","832"}, /**< JERSEY */
-    {wifi_countrycode_JO,"jo","400"}, /**< JORDAN */
+    {wifi_countrycode_JO,"JO","400"}, /**< JORDAN */
     {wifi_countrycode_KE,"KE","404"}, /**< KENYA */
     {wifi_countrycode_KG,"KG","417"}, /**< KYRGYZSTAN */
     {wifi_countrycode_KH,"KH","116"}, /**< CAMBODIA */
@@ -318,7 +319,12 @@ struct wifiCountryEnumStrMapMember wifiCountryMapMembers[] =
     {wifi_countrycode_YU,"YU","890"}, /**< YUGOSLAVIA */
     {wifi_countrycode_ZA,"ZA","710"}, /**< SOUTH AFRICA */
     {wifi_countrycode_ZM,"ZM","894"}, /**< ZAMBIA */
-    {wifi_countrycode_ZW,"ZW","716"} /**< ZIMBABWE */
+    {wifi_countrycode_ZW,"ZW","716"}, /**< ZIMBABWE */
+    {wifi_countrycode_AX,"AX","248"}, /**< ALAND_ISLANDS */
+    {wifi_countrycode_BL,"BL","652"}, /**< SAINT_BARTHELEMY */
+    {wifi_countrycode_CW,"CW","531"}, /**< CURACAO */
+    {wifi_countrycode_MF,"MF","663"}, /**< SAINT_MARTIN */
+    {wifi_countrycode_SX,"SX","534"} /**< SINT_MAARTEN */
 };
 
 struct wifiEnvironmentEnumStrMap wifiEnviromentMap[] =
@@ -804,6 +810,11 @@ void wifi_util_print(wifi_log_level_t level, wifi_dbg_type_t module, char *forma
             snprintf(module_filename, sizeof(module_filename), "wifiBus");
             break;
         }
+        case WIFI_TCM:{
+            snprintf(filename_dbg_enable, sizeof(filename_dbg_enable), LOG_PATH_PREFIX "wifiTCMDbg");
+            snprintf(module_filename, sizeof(module_filename), "wifiTransientClientMgmtCtrl");
+            break;
+        }
         default:
             return;
     }
@@ -1215,11 +1226,11 @@ int macfilter_conversion(char *mac_list_type, size_t string_len,  wifi_vap_info_
             return RETURN_OK;
         } else if (strncmp(mac_list_type, "none", strlen("none")) == 0) {
             vap_info->u.bss_info.mac_filter_enable = FALSE;
-            vap_info->u.bss_info.mac_filter_mode = wifi_mac_filter_mode_white_list;
+            vap_info->u.bss_info.mac_filter_mode = wifi_mac_filter_mode_black_list;
             return RETURN_OK;
         } else if (mac_list_type[0] == '\0') {
             vap_info->u.bss_info.mac_filter_enable = FALSE;
-            vap_info->u.bss_info.mac_filter_mode = wifi_mac_filter_mode_white_list;
+            vap_info->u.bss_info.mac_filter_mode = wifi_mac_filter_mode_black_list;
             return RETURN_OK;
         }
     } else if (conv_type == ENUM_TO_STRING) {
@@ -1953,6 +1964,7 @@ int key_mgmt_conversion_legacy(wifi_security_modes_t *mode_enum, wifi_encryption
             snprintf(str_encryp, encryp_len, "SAE");
             break;
         case wifi_security_mode_wpa3_transition:
+        case wifi_security_mode_wpa3_compatibility:
             snprintf(str_mode, mode_len, "2");
             snprintf(str_encryp, encryp_len, "WPA-PSK SAE");
             break;
@@ -1972,8 +1984,8 @@ int key_mgmt_conversion_legacy(wifi_security_modes_t *mode_enum, wifi_encryption
 
 int key_mgmt_conversion(wifi_security_modes_t *enum_sec, char *str_sec, char *str_sec2, int sec_len, int sec_len2, unsigned int conv_type, int *len)
 {
-    char arr_str[][MAX_SEC_LEN] = {"wpa-psk", "wpa2-psk", "wpa2-eap", "sae", "wpa2-psk sae", "aes", "wpa-eap wpa2-eap", "enhanced-open", "wpa-eap", "wpa-psk wpa2-psk"};
-    wifi_security_modes_t  arr_num[] = {wifi_security_mode_wpa_personal, wifi_security_mode_wpa2_personal, wifi_security_mode_wpa2_enterprise, wifi_security_mode_wpa3_personal, wifi_security_mode_wpa3_transition, wifi_security_mode_wpa3_enterprise, wifi_security_mode_wpa_wpa2_enterprise, wifi_security_mode_enhanced_open, wifi_security_mode_wpa_enterprise, wifi_security_mode_wpa_wpa2_personal};
+    char arr_str[][MAX_SEC_LEN] = {"wpa-psk", "wpa2-psk", "wpa2-eap", "sae", "wpa2-psk sae", "wpa2-psk sae", "aes", "wpa-eap wpa2-eap", "enhanced-open", "wpa-eap", "wpa-psk wpa2-psk"};
+    wifi_security_modes_t  arr_num[] = {wifi_security_mode_wpa_personal, wifi_security_mode_wpa2_personal, wifi_security_mode_wpa2_enterprise, wifi_security_mode_wpa3_personal, wifi_security_mode_wpa3_transition, wifi_security_mode_wpa3_compatibility, wifi_security_mode_wpa3_enterprise, wifi_security_mode_wpa_wpa2_enterprise, wifi_security_mode_enhanced_open, wifi_security_mode_wpa_enterprise, wifi_security_mode_wpa_wpa2_personal};
     unsigned int i = 0;
 
     if ((enum_sec == NULL) || (str_sec == NULL)) {
@@ -1996,7 +2008,7 @@ int key_mgmt_conversion(wifi_security_modes_t *enum_sec, char *str_sec, char *st
     } else if (conv_type == ENUM_TO_STRING) {
         for (i = 0; i < ARRAY_SIZE(arr_num); i++) {
             if (arr_num[i]  == *enum_sec) {
-                if ((*enum_sec == wifi_security_mode_wpa3_transition) || (*enum_sec == wifi_security_mode_wpa_wpa2_enterprise) || (*enum_sec == wifi_security_mode_wpa_wpa2_personal)) {
+                if ((*enum_sec == wifi_security_mode_wpa3_transition) || (*enum_sec == wifi_security_mode_wpa3_compatibility) || (*enum_sec == wifi_security_mode_wpa_wpa2_enterprise) || (*enum_sec == wifi_security_mode_wpa_wpa2_personal)) {
                     *len = 2;
                     char *sec_safe;
                     char *sec1 = strtok_r(arr_str[i], " ", &sec_safe);
@@ -2188,6 +2200,104 @@ int get_radio_index_for_vap_index(wifi_platform_property_t* wifi_prop, int vap_i
     return (prop) ? (int)prop->rdk_radio_index : RETURN_ERR;
 }
 
+bool wifi_radius_config_changed(const wifi_radius_settings_t *old_config,
+                                const wifi_radius_settings_t *new_config)
+{
+    if (!old_config || !new_config) {
+        wifi_util_dbg_print(WIFI_CTRL, "%s: Invalid configuration pointers\n", __func__);
+        return false;
+    }
+
+    bool changed = false;
+
+#ifdef WIFI_HAL_VERSION_3_PHASE2
+    changed |= IS_BIN_CHANGED(&old_config->ip, &new_config->ip, sizeof(ip_addr_t));
+#else
+    changed |= IS_BIN_CHANGED(old_config->ip, new_config->ip, sizeof(old_config->ip));
+#endif
+    changed |= IS_CHANGED(old_config->port, new_config->port);
+    changed |= IS_STR_CHANGED(old_config->key, new_config->key, sizeof(old_config->key));
+    changed |= IS_STR_CHANGED(old_config->identity, new_config->identity, sizeof(old_config->identity));
+
+#ifdef WIFI_HAL_VERSION_3_PHASE2
+    changed |= IS_BIN_CHANGED(&old_config->s_ip, &new_config->s_ip, sizeof(ip_addr_t));
+#else
+    changed |= IS_BIN_CHANGED(old_config->s_ip, new_config->s_ip, sizeof(old_config->s_ip));
+#endif
+    changed |= IS_CHANGED(old_config->s_port, new_config->s_port);
+    changed |= IS_STR_CHANGED(old_config->s_key, new_config->s_key, sizeof(old_config->s_key));
+    changed |= IS_BIN_CHANGED(&old_config->dasip, &new_config->dasip, sizeof(ip_addr_t));
+    changed |= IS_CHANGED(old_config->dasport, new_config->dasport);
+    changed |= IS_STR_CHANGED(old_config->daskey, new_config->daskey, sizeof(old_config->daskey));
+    if (!changed) {
+        wifi_util_dbg_print(WIFI_CTRL, "%s: No RADIUS configuration changes detected\n", __func__);
+    }
+    return changed;
+}
+
+bool should_process_hotspot_config_change(const wifi_vap_info_t *lnf_vap_info, 
+                                         const wifi_vap_info_t *hotspot_vap_info)
+{
+    wifi_util_dbg_print(WIFI_CTRL, "%s: Entry\n", __func__);
+    
+    if (!lnf_vap_info || !hotspot_vap_info) {
+        wifi_util_error_print(WIFI_CTRL, "%s: NULL pointer check failed - lnf_vap_info=%p, hotspot_vap_info=%p\n", 
+                             __func__, lnf_vap_info, hotspot_vap_info);
+        return false;
+    }
+    
+    wifi_util_dbg_print(WIFI_CTRL, "%s: lnf_vap_name=%s, hotspot_vap_name=%s\n", 
+                       __func__, 
+                       lnf_vap_info->vap_name ? lnf_vap_info->vap_name : "NULL",
+                       hotspot_vap_info->vap_name ? hotspot_vap_info->vap_name : "NULL");
+    
+    bool is_mdu_enabled = lnf_vap_info->u.bss_info.mdu_enabled;
+    wifi_util_dbg_print(WIFI_CTRL, "%s: is_mdu_enabled=%s\n", 
+                       __func__, is_mdu_enabled ? "true" : "false");
+    
+    bool is_secure_hotspot = !strncmp(hotspot_vap_info->vap_name, 
+                                     VAP_PREFIX_HOTSPOT_SECURE,
+                                     strlen(VAP_PREFIX_HOTSPOT_SECURE));
+    wifi_util_dbg_print(WIFI_CTRL, "%s: is_secure_hotspot=%s (vap_name=%s, prefix=%s)\n", 
+                       __func__, 
+                       is_secure_hotspot ? "true" : "false",
+                       hotspot_vap_info->vap_name ? hotspot_vap_info->vap_name : "NULL",
+                       VAP_PREFIX_HOTSPOT_SECURE);
+    
+    bool lnf_enabled = lnf_vap_info->u.bss_info.enabled;
+    bool hotspot_enabled = hotspot_vap_info->u.bss_info.enabled;
+    bool vap_enabled_changed = (lnf_enabled != hotspot_enabled);
+    wifi_util_dbg_print(WIFI_CTRL, "%s: vap_enabled_changed=%s (lnf_enabled=%s, hotspot_enabled=%s)\n", 
+                       __func__, 
+                       vap_enabled_changed ? "true" : "false",
+                       lnf_enabled ? "true" : "false",
+                       hotspot_enabled ? "true" : "false");
+    
+    bool radius_config_changed = wifi_radius_config_changed(
+        &lnf_vap_info->u.bss_info.security.repurposed_radius,
+        &hotspot_vap_info->u.bss_info.security.u.radius);
+    wifi_util_dbg_print(WIFI_CTRL, "%s: radius_config_changed=%s\n", 
+                       __func__, radius_config_changed ? "true" : "false");
+    
+    bool result = (is_mdu_enabled &&
+                  is_secure_hotspot &&
+                  (vap_enabled_changed || radius_config_changed));
+    
+    wifi_util_info_print(WIFI_CTRL, "%s: Hotspot vap_name is %s & LnF vap_name is %s and bool is %d:%d:%d:%d:%d - result=%s\n", 
+                        __func__,
+                        hotspot_vap_info->vap_name ? hotspot_vap_info->vap_name : "NULL",
+                        lnf_vap_info->vap_name ? lnf_vap_info->vap_name : "NULL",
+                        is_mdu_enabled ? 1 : 0,
+                        is_secure_hotspot ? 1 : 0,
+                        vap_enabled_changed ? 1 : 0,
+                        radius_config_changed ? 1 : 0,
+                        (vap_enabled_changed || radius_config_changed) ? 1 : 0,
+                        result ? "true" : "false");
+    
+    wifi_util_dbg_print(WIFI_CTRL, "%s: Exit - returning %s\n", __func__, result ? "true" : "false");
+    
+    return result;
+}
 
 int  min_hw_mode_conversion(unsigned int vapIndex, char *inputStr, char *outputStr, char *tableType)
 {
@@ -2277,6 +2387,28 @@ int  vif_radio_idx_conversion(unsigned int vapIndex, int *input, int *output, ch
     }
 
     return RETURN_ERR;
+}
+
+wifi_channelBandwidth_t string_to_channel_width_convert(const char *bandwidth_str) {
+    if (bandwidth_str == NULL) {
+        return WIFI_CHANNELBANDWIDTH_80_80MHZ; // Default case or error handling
+    }
+
+    if (strcmp(bandwidth_str, "20") == 0) {
+        return WIFI_CHANNELBANDWIDTH_20MHZ;
+    } else if (strcmp(bandwidth_str, "40") == 0) {
+        return WIFI_CHANNELBANDWIDTH_40MHZ;
+    } else if (strcmp(bandwidth_str, "80") == 0) {
+        return WIFI_CHANNELBANDWIDTH_80MHZ;
+    } else if (strcmp(bandwidth_str, "160") == 0) {
+        return WIFI_CHANNELBANDWIDTH_160MHZ;
+#ifdef CONFIG_IEEE80211BE
+    } else if (strcmp(bandwidth_str, "320") == 0) {
+        return WIFI_CHANNELBANDWIDTH_320MHZ;
+#endif /* CONFIG_IEEE80211BE */
+    } else {
+        return WIFI_CHANNELBANDWIDTH_80_80MHZ;
+    }
 }
 
 int get_on_channel_scan_list(wifi_freq_bands_t band, wifi_channelBandwidth_t bandwidth, int primary_channel, int *channel_list, int *channels_num)
@@ -3575,6 +3707,127 @@ bool is_6g_supported_device(wifi_platform_property_t *wifi_prop)
     return false;
 }
 
+bool is_vap_param_config_changed(wifi_vap_info_t *vap_info_old, wifi_vap_info_t *vap_info_new,
+    rdk_wifi_vap_info_t *rdk_old, rdk_wifi_vap_info_t *rdk_new, bool isSta)
+{
+
+    if ((vap_info_old == NULL) || (vap_info_new == NULL) || (rdk_old == NULL) ||
+        (rdk_new == NULL)) {
+        wifi_util_error_print(WIFI_WEBCONFIG,
+            "%s:%d: input args are NULL vap_info_old : %p vap_info_new : %p rdk_old : %p rdk_new : "
+            "%p\n",
+            __func__, __LINE__, vap_info_old, vap_info_new, rdk_old, rdk_new);
+        return true;
+    }
+
+    if (IS_CHANGED(rdk_old->exists, rdk_new->exists)) {
+        return true;
+    }
+
+    if (IS_CHANGED(vap_info_old->vap_index, vap_info_new->vap_index) ||
+        IS_STR_CHANGED(vap_info_old->vap_name, vap_info_new->vap_name, sizeof(wifi_vap_name_t)) ||
+        IS_CHANGED(vap_info_old->radio_index, vap_info_new->radio_index) ||
+        IS_STR_CHANGED(vap_info_old->bridge_name, vap_info_new->bridge_name,
+            sizeof(vap_info_old->bridge_name)) ||
+        IS_STR_CHANGED(vap_info_old->repurposed_bridge_name, vap_info_new->repurposed_bridge_name,
+            sizeof(vap_info_old->repurposed_bridge_name)) ||
+        IS_CHANGED(vap_info_old->vap_mode, vap_info_new->vap_mode)) {
+        return true;
+    }
+
+    if (isSta) {
+        // Ignore change of conn_status, scan_params, mac to avoid reconfiguration and disconnection
+        // BSSID change is handled by event.
+        if (IS_STR_CHANGED(vap_info_old->u.sta_info.ssid, vap_info_new->u.sta_info.ssid,
+                sizeof(ssid_t)) ||
+            IS_CHANGED(vap_info_old->u.sta_info.enabled, vap_info_new->u.sta_info.enabled) ||
+            IS_BIN_CHANGED(&vap_info_old->u.sta_info.security, &vap_info_new->u.sta_info.security,
+                sizeof(wifi_vap_security_t))) {
+            return true;
+        }
+    } else {
+        // Ignore bssid change to avoid reconfiguration and disconnection
+        if (IS_STR_CHANGED(vap_info_old->u.bss_info.ssid, vap_info_new->u.bss_info.ssid,
+                sizeof(vap_info_old->u.bss_info.ssid)) ||
+            IS_CHANGED(vap_info_old->u.bss_info.enabled, vap_info_new->u.bss_info.enabled) ||
+            IS_CHANGED(vap_info_old->u.bss_info.showSsid, vap_info_new->u.bss_info.showSsid) ||
+            IS_CHANGED(vap_info_old->u.bss_info.isolation, vap_info_new->u.bss_info.isolation) ||
+            IS_CHANGED(vap_info_old->u.bss_info.mgmtPowerControl,
+                vap_info_new->u.bss_info.mgmtPowerControl) ||
+            IS_CHANGED(vap_info_old->u.bss_info.bssMaxSta, vap_info_new->u.bss_info.bssMaxSta) ||
+            IS_CHANGED(vap_info_old->u.bss_info.inum_sta, vap_info_new->u.bss_info.inum_sta) ||
+            IS_CHANGED(vap_info_old->u.bss_info.bssTransitionActivated,
+                vap_info_new->u.bss_info.bssTransitionActivated) ||
+            IS_CHANGED(vap_info_old->u.bss_info.nbrReportActivated,
+                vap_info_new->u.bss_info.nbrReportActivated) ||
+            IS_CHANGED(vap_info_old->u.bss_info.rapidReconnectEnable,
+                vap_info_new->u.bss_info.rapidReconnectEnable) ||
+            IS_CHANGED(vap_info_old->u.bss_info.rapidReconnThreshold,
+                vap_info_new->u.bss_info.rapidReconnThreshold) ||
+            IS_CHANGED(vap_info_old->u.bss_info.vapStatsEnable,
+                vap_info_new->u.bss_info.vapStatsEnable) ||
+            IS_BIN_CHANGED(&vap_info_old->u.bss_info.security, &vap_info_new->u.bss_info.security,
+                sizeof(wifi_vap_security_t)) ||
+            IS_BIN_CHANGED(&vap_info_old->u.bss_info.interworking,
+                &vap_info_new->u.bss_info.interworking, sizeof(wifi_interworking_t)) ||
+            IS_CHANGED(vap_info_old->u.bss_info.mac_filter_enable,
+                vap_info_new->u.bss_info.mac_filter_enable) ||
+            IS_CHANGED(vap_info_old->u.bss_info.mac_filter_mode,
+                vap_info_new->u.bss_info.mac_filter_mode) ||
+            IS_CHANGED(vap_info_old->u.bss_info.sec_changed,
+                vap_info_new->u.bss_info.sec_changed) ||
+            IS_BIN_CHANGED(&vap_info_old->u.bss_info.wps, &vap_info_new->u.bss_info.wps,
+                sizeof(wifi_wps_t)) ||
+            IS_CHANGED(vap_info_old->u.bss_info.wmm_enabled,
+                vap_info_new->u.bss_info.wmm_enabled) ||
+            IS_CHANGED(vap_info_old->u.bss_info.UAPSDEnabled,
+                vap_info_new->u.bss_info.UAPSDEnabled) ||
+            IS_CHANGED(vap_info_old->u.bss_info.beaconRate, vap_info_new->u.bss_info.beaconRate) ||
+            IS_CHANGED(vap_info_old->u.bss_info.wmmNoAck, vap_info_new->u.bss_info.wmmNoAck) ||
+            IS_CHANGED(vap_info_old->u.bss_info.wepKeyLength,
+                vap_info_new->u.bss_info.wepKeyLength) ||
+            IS_CHANGED(vap_info_old->u.bss_info.bssHotspot, vap_info_new->u.bss_info.bssHotspot) ||
+            IS_CHANGED(vap_info_old->u.bss_info.wpsPushButton,
+                vap_info_new->u.bss_info.wpsPushButton) ||
+            IS_CHANGED(vap_info_old->u.bss_info.connected_building_enabled,
+                vap_info_new->u.bss_info.connected_building_enabled) ||
+            IS_CHANGED(vap_info_old->u.bss_info.mdu_enabled, vap_info_new->u.bss_info.mdu_enabled) ||
+            IS_CHANGED(vap_info_old->u.bss_info.am_config.npc.speed_tier,
+                vap_info_new->u.bss_info.am_config.npc.speed_tier) ||
+            IS_BIN_CHANGED(&vap_info_old->u.bss_info.beaconRateCtl,
+                &vap_info_new->u.bss_info.beaconRateCtl,
+                sizeof(vap_info_old->u.bss_info.beaconRateCtl)) ||
+            IS_CHANGED(vap_info_old->u.bss_info.network_initiated_greylist,
+                vap_info_new->u.bss_info.network_initiated_greylist) ||
+            IS_CHANGED(vap_info_old->u.bss_info.mcast2ucast,
+                vap_info_new->u.bss_info.mcast2ucast) ||
+            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.basic_data_transmit_rates,
+                vap_info_new->u.bss_info.preassoc.basic_data_transmit_rates,
+                sizeof(vap_info_old->u.bss_info.preassoc.basic_data_transmit_rates)) ||
+            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.operational_data_transmit_rates,
+                vap_info_new->u.bss_info.preassoc.operational_data_transmit_rates,
+                sizeof(vap_info_old->u.bss_info.preassoc.operational_data_transmit_rates)) ||
+            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.supported_data_transmit_rates,
+                vap_info_new->u.bss_info.preassoc.supported_data_transmit_rates,
+                sizeof(vap_info_old->u.bss_info.preassoc.supported_data_transmit_rates)) ||
+            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.minimum_advertised_mcs,
+                vap_info_new->u.bss_info.preassoc.minimum_advertised_mcs,
+                sizeof(vap_info_old->u.bss_info.preassoc.minimum_advertised_mcs)) ||
+            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.sixGOpInfoMinRate,
+                vap_info_new->u.bss_info.preassoc.sixGOpInfoMinRate,
+                sizeof(vap_info_old->u.bss_info.preassoc.sixGOpInfoMinRate)) ||
+            IS_CHANGED(vap_info_old->u.bss_info.hostap_mgt_frame_ctrl,
+                vap_info_new->u.bss_info.hostap_mgt_frame_ctrl) ||
+            IS_CHANGED(vap_info_old->u.bss_info.mbo_enabled,
+                vap_info_new->u.bss_info.mbo_enabled) ||
+            IS_CHANGED(vap_info_old->u.bss_info.interop_ctrl,
+                vap_info_new->u.bss_info.interop_ctrl)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 wifi_scan_mode_mapper wifiScanModeMap[] =
 {
     {WIFI_RADIO_SCAN_MODE_NONE, "None"},
@@ -3613,115 +3866,41 @@ int scan_mode_type_conversion(wifi_neighborScanMode_t *scan_mode_enum, char *sca
     return RETURN_ERR;
 }
 
-bool is_vap_param_config_changed(wifi_vap_info_t *vap_info_old, wifi_vap_info_t *vap_info_new,
-    rdk_wifi_vap_info_t *rdk_old, rdk_wifi_vap_info_t *rdk_new, bool isSta)
+int get_partner_id(char *partner_id)
 {
+    char buffer[64];
+    FILE *file;
+    char *pos = NULL;
+    int ret = RETURN_ERR;
 
-    if ((vap_info_old == NULL) || (vap_info_new == NULL) || (rdk_old == NULL) ||
-        (rdk_new == NULL)) {
-        wifi_util_error_print(WIFI_WEBCONFIG,
-            "%s:%d: input args are NULL vap_info_old : %p vap_info_new : %p rdk_old : %p rdk_new : "
-            "%p\n",
-            __func__, __LINE__, vap_info_old, vap_info_new, rdk_old, rdk_new);
-        return true;
+    if ((file = popen("syscfg get partner_id", "r")) != NULL) {
+        pos = fgets(buffer, sizeof(buffer), file);
+        pclose(file);
     }
 
-    if (IS_CHANGED(rdk_old->exists, rdk_new->exists)) {
-        return true;
+    if ((pos == NULL) &&
+            ((file = popen("/lib/rdk/getpartner_id.sh Getpartner_id", "r")) != NULL)) {
+        pos = fgets(buffer, sizeof(buffer), file);
+        pclose(file);
     }
 
-    if (IS_CHANGED(vap_info_old->vap_index, vap_info_new->vap_index) ||
-        IS_STR_CHANGED(vap_info_old->vap_name, vap_info_new->vap_name, sizeof(wifi_vap_name_t)) ||
-        IS_CHANGED(vap_info_old->radio_index, vap_info_new->radio_index) ||
-        IS_STR_CHANGED(vap_info_old->bridge_name, vap_info_new->bridge_name,
-            sizeof(vap_info_old->bridge_name)) ||
-        IS_CHANGED(vap_info_old->vap_mode, vap_info_new->vap_mode)) {
-        return true;
-    }
+    if (pos) {
+        size_t len = strlen (pos);
 
-    if (isSta) {
-        // Ignore change of conn_status, scan_params, mac to avoid reconfiguration and disconnection
-        // BSSID change is handled by event.
-        if (IS_STR_CHANGED(vap_info_old->u.sta_info.ssid, vap_info_new->u.sta_info.ssid,
-                sizeof(ssid_t)) ||
-            IS_CHANGED(vap_info_old->u.sta_info.enabled, vap_info_new->u.sta_info.enabled) ||
-            IS_BIN_CHANGED(&vap_info_old->u.sta_info.security, &vap_info_new->u.sta_info.security,
-                sizeof(wifi_vap_security_t))) {
-            return true;
+        if ((len > 0) && (pos[len - 1] == '\n')) {
+            len--;
         }
+
+        memcpy(partner_id, pos, len);
+        partner_id[len] = 0;
+
+        ret = RETURN_OK;
     } else {
-        // Ignore bssid change to avoid reconfiguration and disconnection
-        if (IS_STR_CHANGED(vap_info_old->u.bss_info.ssid, vap_info_new->u.bss_info.ssid,
-                sizeof(vap_info_old->u.bss_info.ssid)) ||
-            IS_CHANGED(vap_info_old->u.bss_info.enabled, vap_info_new->u.bss_info.enabled) ||
-            IS_CHANGED(vap_info_old->u.bss_info.showSsid, vap_info_new->u.bss_info.showSsid) ||
-            IS_CHANGED(vap_info_old->u.bss_info.isolation, vap_info_new->u.bss_info.isolation) ||
-            IS_CHANGED(vap_info_old->u.bss_info.mgmtPowerControl,
-                vap_info_new->u.bss_info.mgmtPowerControl) ||
-            IS_CHANGED(vap_info_old->u.bss_info.bssMaxSta, vap_info_new->u.bss_info.bssMaxSta) ||
-            IS_CHANGED(vap_info_old->u.bss_info.bssTransitionActivated,
-                vap_info_new->u.bss_info.bssTransitionActivated) ||
-            IS_CHANGED(vap_info_old->u.bss_info.nbrReportActivated,
-                vap_info_new->u.bss_info.nbrReportActivated) ||
-            IS_CHANGED(vap_info_old->u.bss_info.rapidReconnectEnable,
-                vap_info_new->u.bss_info.rapidReconnectEnable) ||
-            IS_CHANGED(vap_info_old->u.bss_info.rapidReconnThreshold,
-                vap_info_new->u.bss_info.rapidReconnThreshold) ||
-            IS_CHANGED(vap_info_old->u.bss_info.vapStatsEnable,
-                vap_info_new->u.bss_info.vapStatsEnable) ||
-            IS_BIN_CHANGED(&vap_info_old->u.bss_info.security, &vap_info_new->u.bss_info.security,
-                sizeof(wifi_vap_security_t)) ||
-            IS_BIN_CHANGED(&vap_info_old->u.bss_info.interworking,
-                &vap_info_new->u.bss_info.interworking, sizeof(wifi_interworking_t)) ||
-            IS_CHANGED(vap_info_old->u.bss_info.mac_filter_enable,
-                vap_info_new->u.bss_info.mac_filter_enable) ||
-            IS_CHANGED(vap_info_old->u.bss_info.mac_filter_mode,
-                vap_info_new->u.bss_info.mac_filter_mode) ||
-            IS_CHANGED(vap_info_old->u.bss_info.sec_changed,
-                vap_info_new->u.bss_info.sec_changed) ||
-            IS_BIN_CHANGED(&vap_info_old->u.bss_info.wps, &vap_info_new->u.bss_info.wps,
-                sizeof(wifi_wps_t)) ||
-            IS_CHANGED(vap_info_old->u.bss_info.wmm_enabled,
-                vap_info_new->u.bss_info.wmm_enabled) ||
-            IS_CHANGED(vap_info_old->u.bss_info.UAPSDEnabled,
-                vap_info_new->u.bss_info.UAPSDEnabled) ||
-            IS_CHANGED(vap_info_old->u.bss_info.beaconRate, vap_info_new->u.bss_info.beaconRate) ||
-            IS_CHANGED(vap_info_old->u.bss_info.wmmNoAck, vap_info_new->u.bss_info.wmmNoAck) ||
-            IS_CHANGED(vap_info_old->u.bss_info.wepKeyLength,
-                vap_info_new->u.bss_info.wepKeyLength) ||
-            IS_CHANGED(vap_info_old->u.bss_info.bssHotspot, vap_info_new->u.bss_info.bssHotspot) ||
-            IS_CHANGED(vap_info_old->u.bss_info.wpsPushButton,
-                vap_info_new->u.bss_info.wpsPushButton) ||
-            IS_CHANGED(vap_info_old->u.bss_info.connected_building_enabled,
-                vap_info_new->u.bss_info.connected_building_enabled) ||
-            IS_BIN_CHANGED(&vap_info_old->u.bss_info.beaconRateCtl,
-                &vap_info_new->u.bss_info.beaconRateCtl,
-                sizeof(vap_info_old->u.bss_info.beaconRateCtl)) ||
-            IS_CHANGED(vap_info_old->u.bss_info.network_initiated_greylist,
-                vap_info_new->u.bss_info.network_initiated_greylist) ||
-            IS_CHANGED(vap_info_old->u.bss_info.mcast2ucast,
-                vap_info_new->u.bss_info.mcast2ucast) ||
-            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.basic_data_transmit_rates,
-                vap_info_new->u.bss_info.preassoc.basic_data_transmit_rates,
-                sizeof(vap_info_old->u.bss_info.preassoc.basic_data_transmit_rates)) ||
-            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.operational_data_transmit_rates,
-                vap_info_new->u.bss_info.preassoc.operational_data_transmit_rates,
-                sizeof(vap_info_old->u.bss_info.preassoc.operational_data_transmit_rates)) ||
-            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.supported_data_transmit_rates,
-                vap_info_new->u.bss_info.preassoc.supported_data_transmit_rates,
-                sizeof(vap_info_old->u.bss_info.preassoc.supported_data_transmit_rates)) ||
-            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.minimum_advertised_mcs,
-                vap_info_new->u.bss_info.preassoc.minimum_advertised_mcs,
-                sizeof(vap_info_old->u.bss_info.preassoc.minimum_advertised_mcs)) ||
-            IS_STR_CHANGED(vap_info_old->u.bss_info.preassoc.sixGOpInfoMinRate,
-                vap_info_new->u.bss_info.preassoc.sixGOpInfoMinRate,
-                sizeof(vap_info_old->u.bss_info.preassoc.sixGOpInfoMinRate)) ||
-            IS_CHANGED(vap_info_old->u.bss_info.hostap_mgt_frame_ctrl,
-                vap_info_new->u.bss_info.hostap_mgt_frame_ctrl)) {
-            return true;
-        }
+        wifi_util_error_print(WIFI_DMCLI,"%s : Error in opening File\n", __func__);
+        *partner_id = 0;
     }
-    return false;
+
+    return ret;
 }
 
 // Countrycode: US, Band 2.4G

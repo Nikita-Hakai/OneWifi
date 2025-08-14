@@ -134,6 +134,7 @@ void process_prefer_private_mac_filter(mac_address_t prefer_private_mac)
             wifi_util_dbg_print(WIFI_CTRL,"add %s mac to %s\n",new_mac_str,rdk_vap_info->vap_name);
         }
     }
+    get_wifictrl_obj()->webconfig_state |= ctrl_webconfig_state_macfilter_cfg_rsp_pending;
 }
 
 int update_managementFramePower(void *arg) {
@@ -237,10 +238,17 @@ int vap_svc_public_update(vap_svc_t *svc, unsigned int radio_index, wifi_vap_inf
         }
         p_tgt_vap_map->vap_array[0].u.bss_info.enabled = enabled;
         if (greylist_rfc || ((pcfg != NULL && pcfg->prefer_private))) {
+#ifdef NL80211_ACL
+            wifi_hal_setApMacAddressControlMode(p_tgt_vap_map->vap_array[0].vap_index, 2);
+#else
             wifi_setApMacAddressControlMode(p_tgt_vap_map->vap_array[0].vap_index, 2);
-        }
-        else {
+#endif
+        } else {
+#ifdef NL80211_ACL
+            wifi_hal_setApMacAddressControlMode(p_tgt_vap_map->vap_array[0].vap_index, 0);
+#else
             wifi_setApMacAddressControlMode(p_tgt_vap_map->vap_array[0].vap_index, 0);
+#endif
         }
         wifi_util_info_print(WIFI_CTRL,"%s: wifi vap create success: radio_index:%d vap_index:%d greylist_rfc:%d\n",__FUNCTION__,
                                                 radio_index, map->vap_array[i].vap_index,greylist_rfc);
@@ -351,10 +359,17 @@ void add_mac_mode_to_public_vaps(bool mac_mode)
                 continue;
             }
             if (mac_mode) {
+#ifdef NL80211_ACL
+                wifi_hal_setApMacAddressControlMode(rdk_vap_info->vap_index, 2);
+#else
                 wifi_setApMacAddressControlMode(rdk_vap_info->vap_index, 2);
-            }
-            else {
+#endif // NL80211_ACL
+            } else {
+#ifdef NL80211_ACL
+                wifi_hal_setApMacAddressControlMode(rdk_vap_info->vap_index, 0);
+#else
                 wifi_setApMacAddressControlMode(rdk_vap_info->vap_index, 0);
+#endif // NL80211_ACL
             }
         }
     }

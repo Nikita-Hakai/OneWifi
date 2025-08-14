@@ -42,7 +42,7 @@ extern "C" {
 #define WIFI_WAN_FAILOVER_TEST              "Device.WiFi.WanFailoverTest"
 #define WIFI_LMLITE_NOTIFY                  "Device.Hosts.X_RDKCENTRAL-COM_LMHost_Sync_From_WiFi"
 #define WIFI_HOTSPOT_NOTIFY                 "Device.X_COMCAST-COM_GRE.Hotspot.ClientChange"
-#define WIFI_NOTIFY_ASSOCIATED_ENTRIES      "Device.NotifyComponent.SetNotifi_ParamName"
+#define WIFI_NOTIFY_SYNC_COMPONENT      "Device.NotifyComponent.SetNotifi_ParamName"
 #define WIFI_NOTIFY_FORCE_DISASSOCIATION    "Device.WiFi.ConnectionControl.ClientForceDisassociation"
 #define WIFI_NOTIFY_DENY_ASSOCIATION        "Device.WiFi.ConnectionControl.ClientDenyAssociation"
 #define MESH_STATUS                         "Device.DeviceInfo.X_RDKCENTRAL-COM_xOpsDeviceMgmt.Mesh.Enable"
@@ -73,6 +73,7 @@ extern "C" {
 #define WIFI_COLLECT_STATS_RADIO_TEMPERATURE           "Device.WiFi.CollectStats.Radio.{i}.RadioTemperatureStats"
 #define WIFI_COLLECT_STATS_VAP_TABLE                   "Device.WiFi.CollectStats.AccessPoint.{i}."
 #define WIFI_COLLECT_STATS_ASSOC_DEVICE_STATS          "Device.WiFi.CollectStats.AccessPoint.{i}.AssociatedDeviceStats"
+#define WIFI_NOTIFY_DENY_TCM_ASSOCIATION               "Device.WiFi.ConnectionControl.TcmClientDenyAssociation"
 #define WIFI_STUCK_DETECT_FILE_NAME         "/nvram/wifi_stuck_detect"
 
 #define PLAN_ID_LENGTH     38
@@ -97,11 +98,29 @@ extern "C" {
 #define MIN_DIAG_INTERVAL   5000
 #define CSI_PING_INTERVAL   100
 
+#define RSS_MEM_THRESHOLD1_DEFAULT 81920 /*Threshold1 is 80MB*/
+#define RSS_MEM_THRESHOLD2_DEFAULT 112640 /*Threshold2 is 110MB*/
+
 #define wifi_sub_component_base     0x01
 #define wifi_app_inst_base          0x01
 
 #define DEFAULT_SOUNDING_DURATION_MS 2000
 
+#if (defined SIMULATION)
+#define NEIGHBORHOOD_SCAN_AVRO_FILENAME         "GatewayAccessPointNeighborScanReport.avsc"
+#define INTERFACE_DEVICES_WIFI_AVRO_FILENAME            "InterfaceDevicesWifi.avsc"
+#define WIFI_SINGLE_CLIENT_AVRO_FILENAME        "/usr/ccsp/wifi/WifiSingleClient.avsc"
+#define RADIO_INTERFACE_STATS_AVRO_FILENAME             "RadioInterfacesStatistics.avsc"
+#else
+#define NEIGHBORHOOD_SCAN_AVRO_FILENAME         "/usr/ccsp/harvester/GatewayAccessPointNeighborScanReport.avsc"
+#define INTERFACE_DEVICES_WIFI_AVRO_FILENAME            "/usr/ccsp/harvester/InterfaceDevicesWifi.avsc"
+#define WIFI_SINGLE_CLIENT_AVRO_FILENAME        "/usr/ccsp/wifi/WifiSingleClient.avsc"
+#define RADIO_INTERFACE_STATS_AVRO_FILENAME             "/usr/ccsp/harvester/RadioInterfacesStatistics.avsc"
+#define WIFI_SINGLE_CLIENT_BLASTER_AVRO_FILENAME        "/usr/ccsp/wifi/WifiSingleClientActiveMeasurement.avsc"
+#endif
+#define CHK_AVRO_ERR (strlen(avro_strerror()) > 0)
+
+#define UNREFERENCED_PARAMETER(_p_) (void)(_p_)
 #define CFG_ID_LEN             64
 typedef char stats_cfg_id_t[CFG_ID_LEN];
 
@@ -161,6 +180,8 @@ typedef void *wifi_analytics_data_t;
 #define BSS_MAX_NUM_STA_SKY      64      /**< Max supported stations for SKY HUB specific platforms */
 #define BSS_MAX_NUM_STA_XB8      100     /**< Max supported stations for TCHX8 specific platform */
 #define BSS_MAX_NUM_STATIONS     100     /**< Max supported stations by RDK-B firmware which would varies based on platform */
+#define BSS_MAX_NUM_STA_HOTSPOT_CBRV2    15      /**< Max supported stations for hotspot vaps in CBR2 platform */
+#define BSS_MAX_NUM_STA_HOTSPOT_XB      5      /**< Max supported stations for hotspot vaps in XB platform */
 
 typedef unsigned char   mac_addr_t[MAC_ADDR_LEN];
 typedef signed short    rssi_t;
@@ -373,25 +394,6 @@ typedef struct {
 }levl_config_t;
 
 typedef struct {
-    int rssi_threshold;
-    bool ReconnectCountEnable[MAX_VAP];
-    bool FeatureMFPConfig;
-    int ChUtilityLogInterval;
-    int DeviceLogInterval;
-
-    bool WifiFactoryReset;
-    int  RadioFactoryResetSSID[MAX_NUM_RADIOS];
-    bool ValidateSSIDName;
-    int  FixedWmmParams;
-    int  AssocCountThreshold;
-    int  AssocMonitorDuration;
-    int  AssocGateTime;
-    bool WiFiTxOverflowSelfheal;
-    bool WiFiForceDisableWiFiRadio;
-    int  WiFiForceDisableRadioStatus;
-} wifi_dml_parameters_t;
-
-typedef struct {
     bool wifi_offchannelscan_app_rfc;
     bool wifi_offchannelscan_sm_rfc;
     bool wifipasspoint_rfc;
@@ -417,6 +419,8 @@ typedef struct {
     bool blaster_enabled_rfc;
     bool greylist_enabled_rfc;
     bool cac_enabled_rfc;
+    bool tcm_enabled_rfc;
+    bool wpa3_compatibility_enable;
 } wifi_rfc_dml_parameters_t;
 
 typedef struct {
@@ -441,6 +445,8 @@ typedef struct {
     int  assoc_gate_time;
     int  whix_log_interval; //seconds
     int  whix_chutility_loginterval; //seconds
+    ULONG rss_memory_restart_threshold_low;
+    ULONG rss_memory_restart_threshold_high;
     int  assoc_monitor_duration;
     bool rapid_reconnect_enable;
     bool vap_stats_feature;
@@ -456,6 +462,10 @@ typedef struct {
     char cli_stat_list[MAX_BUF_LENGTH];
     char snr_list[MAX_BUF_LENGTH];
     char txrx_rate_list[MAX_BUF_LENGTH];
+    bool mgt_frame_rate_limit_enable;
+    int mgt_frame_rate_limit;
+    int mgt_frame_rate_limit_window_size;
+    int mgt_frame_rate_limit_cooldown_time;
 } __attribute__((packed)) wifi_global_param_t;
 
 typedef struct {
@@ -574,6 +584,7 @@ typedef struct {
     hash_map_t              *acl_map;
     hash_map_t              *associated_devices_map; //Full
     hash_map_t              *associated_devices_diff_map; //Add,Remove
+    pthread_mutex_t         *associated_devices_lock;
     int                     kick_device_task_counter;
     bool                    kick_device_config_change;
     bool                    is_mac_filter_initialized;
@@ -748,6 +759,15 @@ typedef struct {
 } __attribute__((packed)) radarInfo_t;
 
 typedef struct {
+    mac_address_t sta_mac;
+    mac_address_t ap_mac;
+    int sta_status_counts[6];
+    int sta_reason_counts[9];
+    int ap_status_counts[6];
+    int ap_reason_counts[9];
+} interop_data_t;
+
+typedef struct {
     char    name[16];
     wifi_radio_operationParam_t oper;
     rdk_wifi_vap_map_t          vaps;
@@ -801,6 +821,18 @@ typedef struct {
 struct active_msmt_data;
 
 typedef struct {
+    mac_address_t sta_mac;
+    int assoc_akm;
+    int eapol_akm;
+    int akm_24_24_count;
+    int akm_8_8_count;
+    int akm_2_2_count;
+    int akm_24_8_count;
+    int akm_24_2_count;
+    int akm_8_2_count;
+} telemetry_data_t;
+
+typedef struct {
     mac_address_t  sta_mac; /* this is mld-mac addr for wifi7 clients */
     unsigned int    good_rssi_time;
     unsigned int    bad_rssi_time;
@@ -812,7 +844,6 @@ typedef struct {
     unsigned int    rapid_reconnects;
     bool            updated;
     wifi_associated_dev3_t dev_stats;
-    wifi_associated_dev3_t dev_stats_last;
     unsigned int    reconnect_count;
     long            assoc_monitor_start_time;
     long            gate_time;

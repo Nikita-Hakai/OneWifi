@@ -54,12 +54,13 @@ typedef struct {
     hash_map_t                      *steering_config_map;
     hash_map_t                      *steering_client_map;
     hash_map_t                      *vif_neighbors_map;
-    wifi_dml_parameters_t           dml_parameters;
     wifi_rfc_dml_parameters_t       rfc_dml_parameters;
     int                             db_version;
 } wifi_mgr_t;
 
 wifi_mgr_t *get_wifimgr_obj();
+wifi_dml_t *get_wifidml_obj(void);
+
 #ifdef __cplusplus
 }
 #endif

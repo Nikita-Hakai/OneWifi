@@ -44,7 +44,7 @@ void init_wifidb(void)
 #define OFFCHAN_DEFAULT_TSCAN_IN_MSEC 63
 #define OFFCHAN_DEFAULT_NSCAN_IN_SEC 10800
 #define OFFCHAN_DEFAULT_TIDLE_IN_SEC 5
-
+#define DEFAULT_MANAGED_WIFI_SPEED_TIER 2
 #define DFS_DEFAULT_TIMER_IN_MIN 30
 
 static int init_radio_config_default(int radio_index, wifi_radio_operationParam_t *config,
@@ -83,9 +83,6 @@ static int init_radio_config_default(int radio_index, wifi_radio_operationParam_
             cfg.channel = 1;
             cfg.channelWidth = WIFI_CHANNELBANDWIDTH_20MHZ;
             cfg.variant = WIFI_80211_VARIANT_G | WIFI_80211_VARIANT_N;
-#ifdef CONFIG_IEEE80211BE
-            cfg.variant |= WIFI_80211_VARIANT_BE;
-#endif /* CONFIG_IEEE80211BE */
             break;
         case WIFI_FREQUENCY_5_BAND:
         case WIFI_FREQUENCY_5L_BAND:
@@ -113,7 +110,7 @@ static int init_radio_config_default(int radio_index, wifi_radio_operationParam_
         case WIFI_FREQUENCY_6_BAND:
             cfg.op_class = 131;
             cfg.operatingClass = 131;
-            cfg.channel = 197;
+            cfg.channel = 5;
             cfg.channelWidth = WIFI_CHANNELBANDWIDTH_160MHZ;
             cfg.variant = WIFI_80211_VARIANT_AX;
 
@@ -138,6 +135,13 @@ static int init_radio_config_default(int radio_index, wifi_radio_operationParam_
         }
     }
     cfg.autoChannelEnabled = true;
+    for(int i=0 ;i<MAX_NUM_CHANNELBANDWIDTH_SUPPORTED;i++)
+    {
+        cfg.channels_per_bandwidth[i].num_channels_list = 0;
+        memset(cfg.channels_per_bandwidth[i].channels_list,0,sizeof(cfg.channels_per_bandwidth[i].channels_list));
+        cfg.channels_per_bandwidth[i].chanwidth = 0;
+    }
+    cfg.acs_keep_out_reset = false;
     cfg.csa_beacon_count = 100;
     country_code_val = wifi_countrycode_US;
     if (wifi_hal_get_default_country_code(country_code) < 0) {
@@ -170,8 +174,6 @@ static int init_radio_config_default(int radio_index, wifi_radio_operationParam_
     cfg.basicDataTransmitRates = WIFI_BITRATE_6MBPS | WIFI_BITRATE_12MBPS | WIFI_BITRATE_24MBPS;
     cfg.operationalDataTransmitRates = WIFI_BITRATE_6MBPS | WIFI_BITRATE_9MBPS | WIFI_BITRATE_12MBPS | WIFI_BITRATE_18MBPS | WIFI_BITRATE_24MBPS | WIFI_BITRATE_36MBPS | WIFI_BITRATE_48MBPS | WIFI_BITRATE_54MBPS;
     Fcfg.radio_index = radio_index;
-    cfg.DFSTimer = DFS_DEFAULT_TIMER_IN_MIN;
-    strncpy(cfg.radarDetected, " ", sizeof(cfg.radarDetected));
     if (is_radio_band_5G(cfg.band)) {
         Fcfg.OffChanTscanInMsec = OFFCHAN_DEFAULT_TSCAN_IN_MSEC;
         Fcfg.OffChanNscanInSec = OFFCHAN_DEFAULT_NSCAN_IN_SEC;
@@ -287,7 +289,7 @@ static int init_vap_config_default(int vap_index, wifi_vap_info_t *config,
         cfg.vap_mode = wifi_vap_mode_sta;
         if (band == WIFI_FREQUENCY_6_BAND) {
             cfg.u.sta_info.security.mode = wifi_security_mode_wpa3_personal;
-            cfg.u.sta_info.security.wpa3_transition_disable = true;
+            cfg.u.sta_info.security.wpa3_transition_disable = false;
             cfg.u.sta_info.security.mfp = wifi_mfp_cfg_required;
             cfg.u.sta_info.security.u.key.type = wifi_security_key_type_sae;
         } else {
@@ -328,7 +330,7 @@ static int init_vap_config_default(int vap_index, wifi_vap_info_t *config,
                 cfg.u.sta_info.scan_params.channel.channel = 157;
                 break;
             case WIFI_FREQUENCY_6_BAND:
-                cfg.u.sta_info.scan_params.channel.channel = 197;
+                cfg.u.sta_info.scan_params.channel.channel = 5;
                 break;
             default:
                 wifi_util_error_print(WIFI_DB,"%s:%d invalid band %d\n", __func__, __LINE__, band);
@@ -355,6 +357,13 @@ static int init_vap_config_default(int vap_index, wifi_vap_info_t *config,
 
         cfg.u.bss_info.network_initiated_greylist = false;
         cfg.u.bss_info.connected_building_enabled = false;
+        cfg.u.bss_info.mdu_enabled = false;
+        if (isVapLnfPsk(vap_index)) {
+            cfg.u.bss_info.am_config.npc.speed_tier = DEFAULT_MANAGED_WIFI_SPEED_TIER;
+        }
+        else {
+            cfg.u.bss_info.am_config.npc.speed_tier = 0;
+        }
         if (isVapPrivate(vap_index)) {
             cfg.u.bss_info.vapStatsEnable = true;
             cfg.u.bss_info.wpsPushButton = 0;
@@ -370,6 +379,7 @@ static int init_vap_config_default(int vap_index, wifi_vap_info_t *config,
             cfg.u.bss_info.mac_filter_mode = wifi_mac_filter_mode_white_list;
         } else {
             cfg.u.bss_info.mac_filter_enable = false;
+            cfg.u.bss_info.mac_filter_mode = wifi_mac_filter_mode_black_list;
         }
         cfg.u.bss_info.UAPSDEnabled = true;
         cfg.u.bss_info.wmmNoAck = false;
@@ -401,7 +411,7 @@ static int init_vap_config_default(int vap_index, wifi_vap_info_t *config,
         } else if (isVapPrivate(vap_index))  {
             if (band == WIFI_FREQUENCY_6_BAND) {
                 cfg.u.bss_info.security.mode = wifi_security_mode_wpa3_personal;
-                cfg.u.bss_info.security.wpa3_transition_disable = true;
+                cfg.u.bss_info.security.wpa3_transition_disable = false;
                 cfg.u.bss_info.security.mfp = wifi_mfp_cfg_required;
                 cfg.u.bss_info.security.u.key.type = wifi_security_key_type_sae;
             } else {
@@ -412,7 +422,7 @@ static int init_vap_config_default(int vap_index, wifi_vap_info_t *config,
         } else  {
             if (band == WIFI_FREQUENCY_6_BAND) {
                 cfg.u.bss_info.security.mode = wifi_security_mode_wpa3_personal;
-                cfg.u.bss_info.security.wpa3_transition_disable = true;
+                cfg.u.bss_info.security.wpa3_transition_disable = false;
                 cfg.u.bss_info.security.mfp = wifi_mfp_cfg_required;
                 cfg.u.bss_info.security.u.key.type = wifi_security_key_type_sae;
             } else {
@@ -441,9 +451,16 @@ static int init_vap_config_default(int vap_index, wifi_vap_info_t *config,
         } else {
             cfg.u.bss_info.showSsid = false;
         }
-        if ((vap_index == 2) || isVapLnf(vap_index) || isVapPrivate(vap_index)) {
-             cfg.u.bss_info.enabled = true;
+/*For XER5/XB10/XER10 2.4G XHS is disable by default*/
+#if defined(_XER5_PRODUCT_REQ_) || defined(_XB10_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_)
+        if (isVapLnf(vap_index) || isVapPrivate(vap_index)) {
+            cfg.u.bss_info.enabled = true;
         }
+#else
+        if ((vap_index == 2) || isVapLnf(vap_index) || isVapPrivate(vap_index)) {
+            cfg.u.bss_info.enabled = true;
+        }
+#endif 
 
         if (isVapPrivate(vap_index)) {
             cfg.u.bss_info.bssMaxSta = wifi_hal_cap_obj->wifi_prop.BssMaxStaAllow;
@@ -561,7 +578,7 @@ void init_wifidb_data(void)
 
         init_vap_config_default(vap_index, vapInfo, rdkVapInfo);
         init_interworking_config_default(vap_index, &vapInfo->u.bss_info.interworking.interworking);
-	init_gas_config_default(&g_wifidb->global_config.gas_config);
+        init_gas_config_default(&g_wifidb->global_config.gas_config);
 
     }
 

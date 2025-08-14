@@ -90,8 +90,23 @@ AC_ARG_ENABLE([journalctl],
 AM_CONDITIONAL([JOURNALCTL_SUPPORT], [test x$JOURNALCTL_SUPPORT_ENABLE = xtrue])
 AC_SUBST(JOURNALCTL_ENABLE_FLAG)
 
+AC_ARG_ENABLE([easyconnect],
+             AS_HELP_STRING([--enable-easyconnect],[enable EasyConnect support (default is no)]),
+             [
+              case "${enableval}" in
+               yes) EASYCONNECT_SUPPORT_ENABLE=true
+                    EASYCONNECT_SUPPORT_FLAG="-DEASYCONNECT_SUPPORT";;
+               no)  EASYCONNECT_SUPPORT_ENABLE=false AC_MSG_ERROR([EasyConnect support is disabled]);;
+               *)   AC_MSG_ERROR([bad value ${enableval} for --enable-easyconnect ]);;
+              esac
+             ],
+             [echo "EasyConnect is disabled"])
+AM_CONDITIONAL([EASYCONNECT_SUPPORT], [test x$EASYCONNECT_SUPPORT_ENABLE = xtrue])
+
 AM_CONDITIONAL([HAL_IPC], [test x$HAL_IPC = xtrue])
 AM_CONDITIONAL([ONEWIFI_CAC_APP_SUPPORT], [test x$ONEWIFI_CAC_APP_SUPPORT = xtrue])
+AM_CONDITIONAL([ONEWIFI_DML_SUPPORT], [test x$ONEWIFI_DML_SUPPORT_MAKEFILE = xtrue])
+AM_CONDITIONAL([ONEWIFI_DBUS_SUPPORT], [test x$ONEWIFI_DBUS_SUPPORT = xtrue])
 
 # Specify ccsp cpu arch
 
@@ -213,6 +228,7 @@ AC_C_INLINE
 AC_FUNC_MALLOC
 
 AC_CONFIG_FILES(
+    source/platform/Makefile
     source/dml/tr_181/sbapi/Makefile
     source/dml/tr_181/ml/Makefile
     source/dml/tr_181/Makefile

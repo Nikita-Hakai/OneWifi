@@ -42,7 +42,6 @@
 #include <assert.h>
 #include <limits.h>
 #include <sysevent/sysevent.h>
-#include "harvester.h"
 #include "wifi_passpoint.h"
 #include "safec_lib_common.h"
 #include <sched.h>
@@ -161,7 +160,10 @@ bool is_blaster_device_associated(int ap_index, mac_address_t sta_mac)
         wifi_util_error_print(WIFI_BLASTER, "%s: Failed to get rdk_vap_info from vap index %d\n", __func__, ap_index);
         return false;
     }
+
+    pthread_mutex_lock(rdk_vap_info->associated_devices_lock);
     if (rdk_vap_info->associated_devices_map == NULL) {
+        pthread_mutex_unlock(rdk_vap_info->associated_devices_lock);
         wifi_util_error_print(WIFI_BLASTER,"%s:%d NULL  associated_devices_map  pointer  for  %d\n", __func__, __LINE__, rdk_vap_info->vap_index);
         return false;
     }
@@ -170,6 +172,7 @@ bool is_blaster_device_associated(int ap_index, mac_address_t sta_mac)
 
     to_sta_key(sta_mac, sta_key);
     sta = (assoc_dev_data_t *) hash_map_get(rdk_vap_info->associated_devices_map, sta_key);
+    pthread_mutex_unlock(rdk_vap_info->associated_devices_lock);
     if (sta == NULL) {
         wifi_util_error_print(WIFI_BLASTER, "%s: Failed to get sta from vap index %d\n", __func__, ap_index);
         return false;
@@ -1520,7 +1523,7 @@ void WiFiBlastClient(void)
     wifi_util_dbg_print(WIFI_BLASTER, "%s : %d exiting the function\n",__func__,__LINE__);
 }
 
-static int send_monitor_event(int event, const char *event_data)
+int send_monitor_event(int event, const char *event_data)
 {
     int ret;
     wifi_monitor_data_t *data;
@@ -1625,10 +1628,9 @@ static void process_request(active_msmt_t *cfg)
 
         if (ctrl->network_mode == rdk_dev_mode_type_ext) {
             active_msmt_report_all_steps(cfg, msg, status);
+            mgr->ctrl.webconfig_state |= ctrl_webconfig_state_blaster_cfg_complete_rsp_pending;
         }
-
         active_msmt_log_message(BLASTER_DEBUG_LOG, "%s:%d %s\n" ,__FUNCTION__, __LINE__, msg);
-        mgr->ctrl.webconfig_state |= ctrl_webconfig_state_blaster_cfg_complete_rsp_pending;
 
         pthread_mutex_unlock(&g_active_msmt->lock);
         return;

@@ -55,22 +55,6 @@ extern "C" {
 #define MAX_NUM_CSI_CLIENTS         5
 #define MAX_LEVL_CSI_CLIENTS        5
 
-#define RSSI_THRESHOLD                     "RssiThresholdValue"
-#define RECONNECT_COUNT_STATUS             "ReconnectCountStatus"
-#define MFP_FEATURE_STATUS                 "MfpFeatureStatus"
-#define CH_UTILITY_LOG_INTERVAL            "ChUtilityLogInterval"
-#define DEVICE_LOG_INTERVAL                "DeviceLogInterval"
-#define WIFI_FACTORY_RESET                 "WifiFactoryReset"
-#define FACTORY_RESET_SSID                 "FactoryResetSSID"
-#define VALIDATE_SSID_NAME                 "ValidateSSIDName"
-#define FIXED_WMM_PARAMS                   "FixedWmmParams"
-#define ASSOC_COUNT_THRESHOLD              "AssocCountThreshold"
-#define ASSOC_MONITOR_DURATION             "AssocMonitorDuration"
-#define ASSOC_GATE_TIME                    "AssocGateTime"
-#define WIFI_TX_OVERFLOW_SELF_HEAL         "WiFiTxOverflowSelfheal"
-#define WIFI_FORCE_DISABLE_RADIO           "WiFiForceDisableWiFiRadio"
-#define WIFI_FORCE_DISABLE_RADIO_STATUS    "WiFiForceDisableRadioStatus"
-
 #define WIFI_BUS_WIFIAPI_COMMAND           "Device.WiFi.WiFiAPI.command"
 #define WIFI_BUS_WIFIAPI_RESULT            "Device.WiFi.WiFiAPI.result"
 
@@ -92,6 +76,9 @@ extern "C" {
 #define BUS_WIFI_WPS_PIN_START             "Device.WiFi.WPS.Start"
 
 #define ETH_BH_STATUS                      "Device.X_RDK_MeshAgent.EthernetBhaulUplink.Status"
+#define ACS_KEEP_OUT                       "Device.X_RDK_MeshAgent.Mesh.ChannelPlan.Data.KeepOut"
+
+#define TR181_GLOBAL_FEATURE_PARAM_GFO_SUPPORTED "Device.X_RDK_Features.GatewayFailover.Enable"
 
 #define WIFI_ALL_RADIO_INDICES             0xffff
 #define DEVICE_TUNNEL_UP                   1
@@ -104,6 +91,11 @@ extern "C" {
 #define HOTSPOT_VAP_MAC_FILTER_ENTRY_SYNC  (15 * 60)
 
 #define MAX_WIFI_SCHED_TIMEOUT         (4 * 1000)
+#define MAX_WIFI_SCHED_CSA_TIMEOUT     (8 * 1000)
+
+#define MAX_HOTSPOT_BLOB_SET_TIMEOUT             100
+#define MAX_WEBCONFIG_HOTSPOT_BLOB_SET_TIMEOUT   120
+#define MAX_VAP_RE_CFG_APPLY_RETRY     2
 
 //This is a dummy string if the value is not passed.
 #define INVALID_KEY                      "12345678"
@@ -113,8 +105,6 @@ extern "C" {
 #define PRIVATE_SUB_DOC                  "privatessid"
 // Connected building wifi subdoc and bus related constants
 #define MULTI_COMP_SUPPORTED_SUBDOC_COUNT 2
-#define MANAGED_WIFI_BRIDGE "Device.LAN.Bridge.1.Name"
-#define MANAGED_WIFI_INTERFACE "Device.LAN.Bridge.1.WiFiInterfaces"
 
 #define PRIVATE 0b0001
 #define HOTSPOT 0b0010
@@ -123,6 +113,10 @@ extern "C" {
 #define MESH_STA 0b10000
 #define MESH_BACKHAUL 0b100000
 #define LNF 0b1000000
+
+#define BUS_DML_CONFIG_FILE "bus_dml_config.json"
+
+#define CTRL_QUEUE_SIZE_MAX (700 * getNumberRadios())
 
 typedef enum {
     ctrl_webconfig_state_none = 0,
@@ -180,12 +174,14 @@ typedef struct {
     int  wifi_csa_sched_handler_id[MAX_NUM_RADIOS];
     int  wifi_radio_sched_handler_id[MAX_NUM_RADIOS];
     int  wifi_vap_sched_handler_id[MAX_NUM_RADIOS * MAX_NUM_VAP_PER_RADIO];
+    int  wifi_acs_sched_handler_id[MAX_NUM_RADIOS];
 } wifi_scheduler_id_t;
 
 typedef enum {
     wifi_csa_sched,
     wifi_radio_sched,
     wifi_vap_sched,
+    wifi_acs_sched
 } wifi_scheduler_type_t;
 
 typedef struct {
@@ -208,10 +204,17 @@ typedef struct {
     pthread_mutex_t      events_bus_lock;
 } events_bus_data_t;
 
+typedef struct hotspot_cfg_sem_param {
+    bool is_init;
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
+    bool cfg_status;
+} hotspot_cfg_sem_param_t;
+
 typedef struct wifi_ctrl {
     bool                exit_ctrl;
     queue_t             *queue;
-    pthread_mutex_t     lock;
+    pthread_mutex_t     queue_lock;
     pthread_cond_t      cond;
     pthread_mutexattr_t attr;
     unsigned int        poll_period;
@@ -233,6 +236,7 @@ typedef struct wifi_ctrl {
     bool                factory_reset;
     bool                marker_list_config_subscribed;
     bool                eth_bh_status_subscribed;
+    bool                mesh_keep_out_chans_subscribed;
     wifiapi_t           wifiapi;
     wifi_rfc_dml_parameters_t    rfc_params;
     unsigned int        sta_tree_instance_num;
@@ -251,6 +255,7 @@ typedef struct wifi_ctrl {
     int                 speed_test_timeout;
     int                 speed_test_running;
     events_bus_data_t   events_bus_data;
+    hotspot_cfg_sem_param_t hotspot_sem_param;
 } wifi_ctrl_t;
 
 
@@ -290,6 +295,11 @@ typedef enum {
 } marker_list_t;
 
 typedef struct {
+    uint8_t radio_index;
+    unsigned int dfs_channel;
+} dfs_channel_data_t;
+
+typedef struct {
     wifi_vap_name_t  vap_name;;
     bool enabled;
 } public_vaps_data_t;
@@ -303,6 +313,7 @@ bool is_db_backup_required();
 
 UINT getRadioIndexFromAp(UINT apIndex);
 UINT getPrivateApFromRadioIndex(UINT radioIndex);
+UINT getApFromRadioIndex(UINT radioIndex, char* vap_prefix);
 CHAR* getVAPName(UINT apIndex);
 BOOL isVapPrivate(UINT apIndex);
 BOOL isVapXhs(UINT apIndex);
@@ -368,6 +379,7 @@ void sta_pending_connection_retry(wifi_ctrl_t *ctrl);
 bool get_wifi_mesh_vap_enable_status(void);
 int get_wifi_mesh_sta_network_status(uint8_t vapIndex, bool *status);
 bool check_for_greylisted_mac_filter(void);
+int update_vap_params_to_hal_and_db(wifi_vap_info_t *vap, bool enable_or_disable);
 void wait_wifi_scan_result(wifi_ctrl_t *ctrl);
 bool is_sta_enabled(void);
 void reset_wifi_radios();
@@ -377,6 +389,10 @@ wifi_vap_security_t * Get_wifi_object_sta_security_parameter(uint8_t vapIndex);
 char *get_assoc_devices_blob();
 void get_subdoc_name_from_vap_index(uint8_t vap_index, int* subdoc);
 int dfs_nop_start_timer(void *args);
+int webconfig_send_full_associate_status(wifi_ctrl_t *ctrl);
+
+bool hotspot_cfg_sem_wait_duration(uint32_t time_in_sec);
+void hotspot_cfg_sem_signal(bool status);
 
 #ifdef __cplusplus
 }

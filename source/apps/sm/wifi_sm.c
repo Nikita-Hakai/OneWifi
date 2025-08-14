@@ -27,6 +27,7 @@
 #include "wifi_mgr.h"
 #include "wifi_sm.h"
 #include "const.h"
+#include "sm_utils.h"
 
 #define DCA_TO_APP 1
 #define APP_TO_DCA 2
@@ -92,18 +93,26 @@ int neighbor_response(wifi_provider_response_t *provider_response)
     wifi_neighborScanMode_t halw_scan_type = provider_response->args.scan_mode;
 
     if (sm_survey_type_conversion(&halw_scan_type, &survey_type, DCA_TO_APP) != RETURN_OK) {
-        wifi_util_error_print(WIFI_SM,"%s:%d: failed to convert scan_mode %d to survey_type for radio_index : %d\r\n",
+        wifi_util_error_print(WIFI_SM,
+            "%s:%d: failed to convert scan_mode %d to survey_type for radio_index : %d\r\n",
             __func__, __LINE__, provider_response->args.scan_mode, radio_index);
         return RETURN_ERR;
     }
 
-    neighbor_ap =  (wifi_neighbor_ap2_t *)provider_response->stat_pointer;
+    neighbor_ap = (wifi_neighbor_ap2_t *)provider_response->stat_pointer;
 
-    wifi_util_dbg_print(WIFI_SM,"%s:%d: radio_index : %d stats_array_size : %d\r\n",__func__, __LINE__, radio_index, provider_response->stat_array_size);
+    wifi_util_dbg_print(WIFI_SM, "%s:%d: radio_index : %d stats_array_size : %d\r\n", __func__,
+        __LINE__, radio_index, provider_response->stat_array_size);
 
-    for (count = 0; count < provider_response->stat_array_size; count++) {
-        wifi_util_dbg_print(WIFI_SM,"%s:%d: count : %d ap_SSID : %s\r\n",__func__, __LINE__, count, neighbor_ap[count].ap_SSID);
-        sm_neighbor_sample_store(radio_index, survey_type, &neighbor_ap[count]);
+    if (provider_response->stat_array_size == 0) {
+        wifi_util_dbg_print(WIFI_SM, "%s:%d: No neighbor APs found in %s on %s\r\n", __func__,
+            __LINE__, survey_type_to_str(survey_type), radio_index_to_radio_type_str(radio_index));
+    } else {
+        for (count = 0; count < provider_response->stat_array_size; count++) {
+            wifi_util_dbg_print(WIFI_SM, "%s:%d: count : %d ap_SSID : %s\r\n", __func__, __LINE__,
+                count, neighbor_ap[count].ap_SSID);
+            sm_neighbor_sample_store(radio_index, survey_type, &neighbor_ap[count]);
+        }
     }
     return RETURN_OK;
 }
@@ -605,13 +614,13 @@ int handle_sm_webconfig_event(wifi_app_t *app, wifi_event_t *event)
     bool off_scan_rfc = g_wifi_mgr->rfc_dml_parameters.wifi_offchannelscan_sm_rfc;
     webconfig_subdoc_data_t *webconfig_data = NULL;
     if (event == NULL) {
-        wifi_util_dbg_print(WIFI_SM,"%s %d input arguements are NULL\n", __func__, __LINE__);
+        wifi_util_dbg_print(WIFI_SM, "%s %d input arguements are NULL\n", __func__, __LINE__);
         return RETURN_ERR;
     }
 
     webconfig_data = event->u.webconfig_data;
     if (webconfig_data == NULL) {
-        wifi_util_dbg_print(WIFI_SM,"%s %d webconfig_data is NULL\n", __func__, __LINE__);
+        wifi_util_dbg_print(WIFI_SM, "%s %d webconfig_data is NULL\n", __func__, __LINE__);
         return RETURN_ERR;
     }
 
@@ -619,31 +628,37 @@ int handle_sm_webconfig_event(wifi_app_t *app, wifi_event_t *event)
         return RETURN_ERR;
     }
 
-
     hash_map_t *new_ctrl_stats_cfg_map = webconfig_data->u.decoded.stats_config_map;
     hash_map_t *cur_app_stats_cfg_map = app->data.u.sm_data.sm_stats_config_map;
     stats_config_t *cur_stats_cfg, *new_stats_cfg, *tmp_stats_cfg;
     stats_config_t *temp_stats_config;
-    char key[64] = {0};
+    char key[64] = { 0 };
 
     if (new_ctrl_stats_cfg_map == NULL) {
-        wifi_util_dbg_print(WIFI_SM,"%s %d input ctrl stats map is null, Nothing to update\n", __func__, __LINE__);
+        wifi_util_dbg_print(WIFI_SM, "%s %d input ctrl stats map is null, Nothing to update\n",
+            __func__, __LINE__);
         return RETURN_ERR;
     }
 
-    //update neigbour sampling_interval to survey interval if value is 0
+    // update neigbour sampling_interval to survey interval if value is 0
     new_stats_cfg = hash_map_get_first(new_ctrl_stats_cfg_map);
     while (new_stats_cfg != NULL) {
-        if (new_stats_cfg->stats_type == stats_type_neighbor && new_stats_cfg->sampling_interval == 0 ) {
-            //search survey configuration.
+        if (new_stats_cfg->stats_type == stats_type_neighbor &&
+            new_stats_cfg->sampling_interval == 0) {
+            // search survey configuration.
             tmp_stats_cfg = hash_map_get_first(new_ctrl_stats_cfg_map);
             while (tmp_stats_cfg != NULL) {
-                if (tmp_stats_cfg->stats_type == stats_type_survey && tmp_stats_cfg->radio_type == new_stats_cfg->radio_type
-                    && tmp_stats_cfg->survey_type == new_stats_cfg->survey_type && tmp_stats_cfg->sampling_interval != 0) {
-                        new_stats_cfg->sampling_interval = tmp_stats_cfg->sampling_interval;
-                        wifi_util_dbg_print(WIFI_SM,"%s %d update sampling_interval for neighbor stats_type_neighbor(radio_type %d, survey_type %d) to %u\n", __func__, __LINE__,
-                                        new_stats_cfg->radio_type, new_stats_cfg->survey_type, new_stats_cfg->sampling_interval);
-                        break;
+                if (tmp_stats_cfg->stats_type == stats_type_survey &&
+                    tmp_stats_cfg->radio_type == new_stats_cfg->radio_type &&
+                    tmp_stats_cfg->survey_type == new_stats_cfg->survey_type &&
+                    tmp_stats_cfg->sampling_interval != 0) {
+                    new_stats_cfg->sampling_interval = tmp_stats_cfg->sampling_interval;
+                    wifi_util_dbg_print(WIFI_SM,
+                        "%s %d update sampling_interval for neighbor "
+                        "stats_type_neighbor(radio_type %d, survey_type %d) to %u\n",
+                        __func__, __LINE__, new_stats_cfg->radio_type, new_stats_cfg->survey_type,
+                        new_stats_cfg->sampling_interval);
+                    break;
                 }
                 tmp_stats_cfg = hash_map_get_next(new_ctrl_stats_cfg_map, tmp_stats_cfg);
             }
@@ -651,25 +666,51 @@ int handle_sm_webconfig_event(wifi_app_t *app, wifi_event_t *event)
         new_stats_cfg = hash_map_get_next(new_ctrl_stats_cfg_map, new_stats_cfg);
     }
 
-    //search for the deleted elements if any in new_ctrl_stats_cfg
+    // update neigbour survey_interval to survey's interval if value is 0
+    new_stats_cfg = hash_map_get_first(new_ctrl_stats_cfg_map);
+    while (new_stats_cfg != NULL) {
+        if (new_stats_cfg->stats_type == stats_type_neighbor &&
+            new_stats_cfg->survey_interval == 0) {
+            // search survey configuration.
+            tmp_stats_cfg = hash_map_get_first(new_ctrl_stats_cfg_map);
+            while (tmp_stats_cfg != NULL) {
+                if (tmp_stats_cfg->stats_type == stats_type_survey &&
+                    tmp_stats_cfg->radio_type == new_stats_cfg->radio_type &&
+                    tmp_stats_cfg->survey_type == new_stats_cfg->survey_type &&
+                    tmp_stats_cfg->survey_interval != 0) {
+                    new_stats_cfg->survey_interval = tmp_stats_cfg->survey_interval;
+                    wifi_util_dbg_print(WIFI_SM,
+                        "%s %d update survey_interval for neighbor "
+                        "stats_type_neighbor(radio_type %d, survey_type %d) to %u\n",
+                        __func__, __LINE__, new_stats_cfg->radio_type, new_stats_cfg->survey_type,
+                        new_stats_cfg->survey_interval);
+                    break;
+                }
+                tmp_stats_cfg = hash_map_get_next(new_ctrl_stats_cfg_map, tmp_stats_cfg);
+            }
+        }
+        new_stats_cfg = hash_map_get_next(new_ctrl_stats_cfg_map, new_stats_cfg);
+    }
+
+    // search for the deleted elements if any in new_ctrl_stats_cfg
     if (cur_app_stats_cfg_map != NULL) {
         cur_stats_cfg = hash_map_get_first(cur_app_stats_cfg_map);
         while (cur_stats_cfg != NULL) {
             if (hash_map_get(new_ctrl_stats_cfg_map, cur_stats_cfg->stats_cfg_id) == NULL) {
-                //send the delete and remove elem from cur_stats_cfg
+                // send the delete and remove elem from cur_stats_cfg
                 memset(key, 0, sizeof(key));
                 snprintf(key, sizeof(key), "%s", cur_stats_cfg->stats_cfg_id);
-                push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_stop, cur_stats_cfg);
+                push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_stop,
+                    cur_stats_cfg);
                 cur_stats_cfg = hash_map_get_next(cur_app_stats_cfg_map, cur_stats_cfg);
 
-                //Temporary removal, need to uncomment it
+                // Temporary removal, need to uncomment it
                 temp_stats_config = hash_map_remove(cur_app_stats_cfg_map, key);
                 if (temp_stats_config != NULL) {
                     free(temp_stats_config);
                 }
             } else {
                 cur_stats_cfg = hash_map_get_next(cur_app_stats_cfg_map, cur_stats_cfg);
-
             }
         }
     }
@@ -682,27 +723,46 @@ int handle_sm_webconfig_event(wifi_app_t *app, wifi_event_t *event)
             if (cur_stats_cfg == NULL) {
                 cur_stats_cfg = (stats_config_t *)malloc(sizeof(stats_config_t));
                 if (cur_stats_cfg == NULL) {
-                    wifi_util_error_print(WIFI_SM,"%s %d NULL pointer \n", __func__, __LINE__);
+                    wifi_util_error_print(WIFI_SM, "%s %d NULL pointer \n", __func__, __LINE__);
                     return RETURN_ERR;
                 }
                 memset(cur_stats_cfg, 0, sizeof(stats_config_t));
                 memcpy(cur_stats_cfg, new_stats_cfg, sizeof(stats_config_t));
-                hash_map_put(cur_app_stats_cfg_map, strdup(cur_stats_cfg->stats_cfg_id), cur_stats_cfg);
-                //Notification for new entry.
-                if(!(!off_scan_rfc && cur_stats_cfg->survey_type == survey_type_off_channel && ( cur_stats_cfg->radio_type == WIFI_FREQUENCY_5_BAND || cur_stats_cfg->radio_type == WIFI_FREQUENCY_5L_BAND || cur_stats_cfg->radio_type == WIFI_FREQUENCY_5H_BAND ))) {
-                     push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_start, cur_stats_cfg);
+                hash_map_put(cur_app_stats_cfg_map, strdup(cur_stats_cfg->stats_cfg_id),
+                    cur_stats_cfg);
+                // Notification for new entry.
+                if (!(!off_scan_rfc && cur_stats_cfg->survey_type == survey_type_off_channel &&
+                        (cur_stats_cfg->radio_type == WIFI_FREQUENCY_5_BAND ||
+                            cur_stats_cfg->radio_type == WIFI_FREQUENCY_5L_BAND ||
+                            cur_stats_cfg->radio_type == WIFI_FREQUENCY_5H_BAND))) {
+                    push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_start,
+                        cur_stats_cfg);
                 }
             } else {
                 if (memcmp(cur_stats_cfg, new_stats_cfg, sizeof(stats_config_t)) != 0) {
+                    if (new_stats_cfg->sampling_interval != cur_stats_cfg->sampling_interval) {
+                        radio_type_t radio_type = freq_band_to_dpp_radio_type(
+                            new_stats_cfg->radio_type);
+                        wifi_util_error_print(WIFI_SM,
+                            "%s %d Reconfigured sampling interval as %u secs for %s stats type of "
+                            "%s radio\n",
+                            __func__, __LINE__, new_stats_cfg->sampling_interval,
+                            stats_type_to_str(new_stats_cfg->stats_type),
+                            radio_get_name_from_type(radio_type));
+                    }
                     memcpy(cur_stats_cfg, new_stats_cfg, sizeof(stats_config_t));
-                    if(!off_scan_rfc && cur_stats_cfg->survey_type == survey_type_off_channel && ( cur_stats_cfg->radio_type == WIFI_FREQUENCY_5_BAND || cur_stats_cfg->radio_type == WIFI_FREQUENCY_5L_BAND || cur_stats_cfg->radio_type == WIFI_FREQUENCY_5H_BAND )) {
-                        if (is_scan_scheduled(app,cur_stats_cfg))
-                        {
-                            push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_stop, cur_stats_cfg);
+                    if (!off_scan_rfc && cur_stats_cfg->survey_type == survey_type_off_channel &&
+                        (cur_stats_cfg->radio_type == WIFI_FREQUENCY_5_BAND ||
+                            cur_stats_cfg->radio_type == WIFI_FREQUENCY_5L_BAND ||
+                            cur_stats_cfg->radio_type == WIFI_FREQUENCY_5H_BAND)) { 
+                        if (is_scan_scheduled(app, cur_stats_cfg)) {
+                            push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_stop,
+                                cur_stats_cfg);
                         }
                     } else {
-                        //Notification for update entry.
-                        push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_start, cur_stats_cfg);
+                        // Notification for update entry.
+                        push_sm_config_event_to_monitor_queue(app, mon_stats_request_state_start,
+                            cur_stats_cfg);
                     }
                 }
             }

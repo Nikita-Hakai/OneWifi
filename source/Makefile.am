@@ -19,12 +19,14 @@
 SUBDIRS = utils core
 
 if WITH_LIBWEBCONFIG
-SUBDIRS += webconfig
+SUBDIRS += platform webconfig
 endif
 
 SUBDIRS += test/core
 SUBDIRS += sampleapps
+if ONEWIFI_DML_SUPPORT
 SUBDIRS += dml
+endif
 
 if WITH_GTEST_SUPPORT
 SUBDIRS += test

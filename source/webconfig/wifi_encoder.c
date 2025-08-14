@@ -35,6 +35,8 @@
 #include "wifi_ctrl.h"
 #include "wifi_util.h"
 
+#define TCM_WEIGH "0.6"
+#define TCMTHRESHOLD "0.18"
 webconfig_error_t encode_radio_setup_object(const rdk_wifi_vap_map_t *vap_map, cJSON *radio_object)
 {
     cJSON *obj_array, *obj;
@@ -261,8 +263,9 @@ webconfig_error_t encode_radio_object(const rdk_wifi_radio_t *radio, cJSON *radi
     // GuardInterval
     cJSON_AddNumberToObject(radio_object, "GuardInterval", radio_info->guardInterval);
 
-    // TransmitPower
-    cJSON_AddNumberToObject(radio_object, "TransmitPower", radio_info->transmitPower);
+    // TransmitPower, 0 not allowed
+    cJSON_AddNumberToObject(radio_object, "TransmitPower",
+        radio_info->transmitPower != 0 ? radio_info->transmitPower : 100);
 
     // BeaconInterval
     cJSON_AddNumberToObject(radio_object, "BeaconInterval", radio_info->beaconInterval);
@@ -348,6 +351,9 @@ webconfig_error_t encode_vap_common_object(const wifi_vap_info_t *vap_info,
     //Bridge Name
     cJSON_AddStringToObject(vap_object, "BridgeName", vap_info->bridge_name);
 
+    //Repurposed Bridge Name
+    cJSON_AddStringToObject(vap_object, "RepurposedBridgeName", vap_info->repurposed_bridge_name);
+
     //VAP Name
     cJSON_AddStringToObject(vap_object, "RepurposedVapName", vap_info->repurposed_vap_name);
 
@@ -372,12 +378,19 @@ webconfig_error_t encode_vap_common_object(const wifi_vap_info_t *vap_info,
 
     // Broadcast SSID
     cJSON_AddBoolToObject(vap_object, "SSIDAdvertisementEnabled", vap_info->u.bss_info.showSsid);
+    // Speed Tier for Amenity Network
+    cJSON_AddNumberToObject(vap_object, "SpeedTier", vap_info->u.bss_info.am_config.npc.speed_tier);
+
+    // Managed WiFi Phase 2 Enabled
+    cJSON_AddBoolToObject(vap_object, "MDUEnabled", vap_info->u.bss_info.mdu_enabled);
 
     // Isolation
     cJSON_AddBoolToObject(vap_object, "IsolationEnable", vap_info->u.bss_info.isolation);
 
     // ManagementFramePowerControl
     cJSON_AddNumberToObject(vap_object, "ManagementFramePowerControl", vap_info->u.bss_info.mgmtPowerControl);
+
+    cJSON_AddNumberToObject(vap_object, "InteropNumSta", vap_info->u.bss_info.inum_sta);
 
     // BssMaxNumSta
     cJSON_AddNumberToObject(vap_object, "BssMaxNumSta", vap_info->u.bss_info.bssMaxSta);
@@ -426,7 +439,6 @@ webconfig_error_t encode_vap_common_object(const wifi_vap_info_t *vap_info,
 
     // BssHotspot
     cJSON_AddBoolToObject(vap_object, "BssHotspot", vap_info->u.bss_info.bssHotspot);
-
     // wpsPushButton
     cJSON_AddNumberToObject(vap_object, "WpsPushButton", vap_info->u.bss_info.wpsPushButton);
 
@@ -439,7 +451,6 @@ webconfig_error_t encode_vap_common_object(const wifi_vap_info_t *vap_info,
         //WpsConfigPin
         cJSON_AddStringToObject(vap_object, "WpsConfigPin", vap_info->u.bss_info.wps.pin);
     }
-
     // BeaconRateCtl
     cJSON_AddStringToObject(vap_object, "BeaconRateCtl", vap_info->u.bss_info.beaconRateCtl);
 
@@ -450,6 +461,10 @@ webconfig_error_t encode_vap_common_object(const wifi_vap_info_t *vap_info,
     // HostapMgtFrameCtrl
     cJSON_AddBoolToObject(vap_object, "HostapMgtFrameCtrl",
         vap_info->u.bss_info.hostap_mgt_frame_ctrl);
+
+    // InteropCtrl
+    cJSON_AddBoolToObject(vap_object, "InteropCtrl",
+        vap_info->u.bss_info.interop_ctrl);
 
     cJSON_AddBoolToObject(vap_object, "MboEnabled", vap_info->u.bss_info.mbo_enabled);
 
@@ -544,11 +559,31 @@ webconfig_error_t encode_preassoc_object(const wifi_preassoc_control_t *preassoc
     } else {
         cJSON_AddStringToObject(preassoc, "6GOpInfoMinRate", preassoc_info->sixGOpInfoMinRate);
     }
-
     wifi_util_dbg_print(WIFI_WEBCONFIG,"%s:%d: Encoding preassoc settings passed\n", __func__, __LINE__);
 
     return webconfig_error_none;
 }
+
+
+webconfig_error_t encode_tcm_preassoc_object(const wifi_preassoc_control_t *preassoc_info, cJSON *preassoc)
+{
+    cJSON_AddNumberToObject(preassoc, "TcmWaitTime", preassoc_info->time_ms);
+    cJSON_AddNumberToObject(preassoc, "TcmMinMgmtFrames", preassoc_info->min_num_mgmt_frames);
+    if(strlen((char *)preassoc_info->tcm_exp_weightage) == 0) {
+        cJSON_AddStringToObject(preassoc, "TcmExpWeightage", TCM_WEIGH);
+    } else {
+        cJSON_AddStringToObject(preassoc, "TcmExpWeightage", preassoc_info->tcm_exp_weightage);
+    }
+    if(strlen((char *)preassoc_info->tcm_gradient_threshold) == 0) {
+        cJSON_AddStringToObject(preassoc, "TcmGradientThreshold", TCMTHRESHOLD);
+    } else {
+        cJSON_AddStringToObject(preassoc, "TcmGradientThreshold", preassoc_info->tcm_gradient_threshold);
+    }
+    wifi_util_dbg_print(WIFI_WEBCONFIG,"%s:%d: Encoding tcm preassoc settings passed\n", __func__, __LINE__);
+
+    return webconfig_error_none;
+}
+
 
 webconfig_error_t encode_connection_ctrl_object(const wifi_vap_info_t *vap_info, cJSON *vap_obj)
 {
@@ -561,6 +596,13 @@ webconfig_error_t encode_connection_ctrl_object(const wifi_vap_info_t *vap_info,
     cJSON_AddItemToObject(vap_obj, "PreAssociationDeny", obj);
     if (encode_preassoc_object(&vap_info->u.bss_info.preassoc, obj) != webconfig_error_none) {
         wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d Preassoc object encode failed for %s\n",__FUNCTION__, __LINE__, vap_info->vap_name);
+        return webconfig_error_encode;
+    }
+
+    obj = cJSON_CreateObject();
+    cJSON_AddItemToObject(vap_obj, "TcmPreAssociationDeny", obj);
+    if (encode_tcm_preassoc_object(&vap_info->u.bss_info.preassoc, obj) != webconfig_error_none) {
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d TcmPreassoc object encode failed for %s\n",__FUNCTION__, __LINE__, vap_info->vap_name);
         return webconfig_error_encode;
     }
 
@@ -647,7 +689,7 @@ webconfig_error_t encode_wifi_global_config(const wifi_global_param_t *global_in
 
     //WpsPin
     cJSON_AddStringToObject(global_obj, "WpsPin", global_info->wps_pin);
-
+    
     // BandsteeringEnable
     cJSON_AddBoolToObject(global_obj, "BandsteeringEnable", (const cJSON_bool)global_info->bandsteering_enable);
 
@@ -665,6 +707,12 @@ webconfig_error_t encode_wifi_global_config(const wifi_global_param_t *global_in
 
     //Whix_ChUtility_Loginterval
     cJSON_AddNumberToObject(global_obj, "whix_chutility_loginterval", global_info->whix_chutility_loginterval);
+
+    // RSS Mem threshold1
+    cJSON_AddNumberToObject(global_obj, "rss_memory_restart_threshold_low", global_info->rss_memory_restart_threshold_low);
+
+    // RSS Mem threshold2
+    cJSON_AddNumberToObject(global_obj, "rss_memory_restart_threshold_high", global_info->rss_memory_restart_threshold_high);
 
     //AssocMonitorDuration
     cJSON_AddNumberToObject(global_obj, "AssocMonitorDuration", global_info->assoc_monitor_duration);
@@ -710,6 +758,21 @@ webconfig_error_t encode_wifi_global_config(const wifi_global_param_t *global_in
 
     //TxRxRateList
     cJSON_AddStringToObject(global_obj, "TxRxRateList", global_info->txrx_rate_list);
+
+    // MgtFrameRateLimitEnable
+    cJSON_AddBoolToObject(global_obj, "MgtFrameRateLimitEnable",
+        global_info->mgt_frame_rate_limit_enable);
+
+    // MgtFrameRateLimit
+    cJSON_AddNumberToObject(global_obj, "MgtFrameRateLimit", global_info->mgt_frame_rate_limit);
+
+    // MgtFrameRateLimitWindowSize
+    cJSON_AddNumberToObject(global_obj, "MgtFrameRateLimitWindowSize",
+        global_info->mgt_frame_rate_limit_window_size);
+
+    // MgtFrameRateLimitCooldownTime
+    cJSON_AddNumberToObject(global_obj, "MgtFrameRateLimitCooldownTime",
+        global_info->mgt_frame_rate_limit_cooldown_time);
 
     return webconfig_error_none;
 }
@@ -904,6 +967,7 @@ webconfig_error_t encode_interworking_common_object(const wifi_interworking_t *i
     return webconfig_error_none;
 }
 
+
 webconfig_error_t encode_radius_object(const wifi_radius_settings_t *radius_info, cJSON *radius)
 {
     char str[64];
@@ -970,6 +1034,7 @@ webconfig_error_t encode_security_object(const wifi_vap_security_t *security_inf
 
     if (is_6g &&
         security_info->mode != wifi_security_mode_wpa3_personal &&
+        security_info->mode != wifi_security_mode_wpa3_compatibility &&
         security_info->mode != wifi_security_mode_wpa3_enterprise &&
         security_info->mode != wifi_security_mode_enhanced_open) {
         wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d invalid security mode %d for 6G interface\n",
@@ -1022,6 +1087,10 @@ webconfig_error_t encode_security_object(const wifi_vap_security_t *security_inf
             cJSON_AddStringToObject(security, "Mode", "WPA3-Enterprise");
             break;
 
+        case wifi_security_mode_wpa3_compatibility:
+            cJSON_AddStringToObject(security, "Mode", "WPA3-Personal-Compatibility");
+            break;
+
         default:
             wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d failed to encode security mode: %d\n",
                 __func__, __LINE__, security_info->mode);
@@ -1061,6 +1130,13 @@ webconfig_error_t encode_security_object(const wifi_vap_security_t *security_inf
         return webconfig_error_encode;
     }
 #endif // CONFIG_IEEE80211BE
+
+    if(security_info->mode == wifi_security_mode_wpa3_compatibility &&
+       security_info->mfp != wifi_mfp_cfg_disabled) {
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d Invalid MFP Config %d for %d mode \n",
+            __func__, __LINE__, security_info->mfp, security_info->mode);
+        return webconfig_error_encode;
+    }
 
     if (security_info->mfp == wifi_mfp_cfg_disabled) {
         cJSON_AddStringToObject(security, "MFPConfig", "Disabled");
@@ -1549,6 +1625,8 @@ webconfig_error_t encode_frame_data(cJSON *obj_assoc_client, frame_data_t *frame
 webconfig_error_t encode_associated_client_object(rdk_wifi_vap_info_t *rdk_vap_info, cJSON *assoc_array, assoclist_type_t assoclist_type)
 {
     bool print_assoc_client = false;
+    pthread_mutex_t *associated_devices_lock;
+
     if ((rdk_vap_info == NULL) || (assoc_array == NULL)) {
         wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d Associated Client encode failed\n",__FUNCTION__, __LINE__);
         return webconfig_error_encode;
@@ -1565,6 +1643,10 @@ webconfig_error_t encode_associated_client_object(rdk_wifi_vap_info_t *rdk_vap_i
     cJSON_AddStringToObject(obj_vaps, "VapName", rdk_vap_info->vap_name);
     cJSON_AddItemToObject(obj_vaps, "associatedClients", obj_array);
 
+    associated_devices_lock = rdk_vap_info->associated_devices_lock;
+    if (associated_devices_lock != NULL) {
+        pthread_mutex_lock(associated_devices_lock);
+    }
     switch (assoclist_type)  {
         case assoclist_type_full:
             devices_map = rdk_vap_info->associated_devices_map;
@@ -1574,6 +1656,9 @@ webconfig_error_t encode_associated_client_object(rdk_wifi_vap_info_t *rdk_vap_i
             devices_map = rdk_vap_info->associated_devices_diff_map;
         break;
         default:
+            if (associated_devices_lock != NULL) {
+                pthread_mutex_unlock(associated_devices_lock);
+            }
             return webconfig_error_encode;
     }
 
@@ -1637,6 +1722,10 @@ webconfig_error_t encode_associated_client_object(rdk_wifi_vap_info_t *rdk_vap_i
             assoc_dev_data = hash_map_get_next(devices_map, assoc_dev_data);
         }
     }
+    if (associated_devices_lock != NULL) {
+        pthread_mutex_unlock(associated_devices_lock);
+    }
+
     return webconfig_error_none;
 }
 
@@ -2306,15 +2395,11 @@ webconfig_error_t encode_radiodiag_params(wifi_provider_response_t *radiodiag_st
         }
 
         cJSON_AddItemToArray(radiodiag_obj, diag_obj);
-        cJSON_AddStringToObject(diag_obj, "frequency_band", diag_stats[count].frequency_band);
-        cJSON_AddStringToObject(diag_obj, "ChannelsInUse", diag_stats[count].ChannelsInUse);
         cJSON_AddNumberToObject(diag_obj, "primary_radio_channel", diag_stats[count].primary_radio_channel);
-        cJSON_AddStringToObject(diag_obj, "channel_bandwidth", diag_stats[count].channel_bandwidth);
         cJSON_AddNumberToObject(diag_obj, "RadioActivityFactor", diag_stats[count].RadioActivityFactor);
         cJSON_AddNumberToObject(diag_obj, "CarrierSenseThreshold_Exceeded", diag_stats[count].CarrierSenseThreshold_Exceeded);
         cJSON_AddNumberToObject(diag_obj, "NoiseFloor", diag_stats[count].NoiseFloor);
         cJSON_AddNumberToObject(diag_obj, "channelUtil", diag_stats[count].channelUtil);
-        cJSON_AddNumberToObject(diag_obj, "channelInterference", diag_stats[count].channelInterference);
         cJSON_AddNumberToObject(diag_obj, "radio_BytesSent", diag_stats[count].radio_BytesSent);
         cJSON_AddNumberToObject(diag_obj, "radio_BytesReceived", diag_stats[count].radio_BytesReceived);
         cJSON_AddNumberToObject(diag_obj, "radio_PacketsSent", diag_stats[count].radio_PacketsSent);

@@ -30,6 +30,8 @@
 
 #define  ANSC_STATUS_SUCCESS                        0
 
+#define MONITOR_QUEUE_SIZE_MAX (700 * getNumberRadios())
+
 typedef struct {
     unsigned int        rapid_reconnect_threshold;
     wifi_vapstatus_t    ap_status;
@@ -38,10 +40,42 @@ typedef struct {
 typedef struct {
     unsigned char bssid[32];
     hash_map_t *sta_map; //of type sta_data_t
+    hash_map_t *interop_sta_map;
+    hash_map_t *wpa3_sta_map;
     struct timespec last_sta_update_time;
     ap_params_t ap_params;
     ssid_t                  ssid;
 } bssid_data_t;
+
+#define WPA2_PSK 2
+#define WPA3_SAE 8
+#define WPA3_SAE_EXT 24
+
+typedef enum {
+    BAND_2_4GHZ,
+    BAND_5GHZ,
+    BAND_6GHZ
+} wifi_band_t;
+
+typedef enum {
+    RSNE,
+    RSNO,
+    RSNO2,
+    UNKNOWN
+} rsn_variant_t;
+
+typedef enum {
+    ASSOC_REQUEST = 0,
+    REASSOC_REQUEST = 1,
+    EAPOL = 2
+} frame_type_t;
+
+typedef enum {
+    SECURITY_WPA2_Personal = 0x00000010,
+    SECURITY_WPA3_Personal = 0x00000200,
+    SECURITY_WPA3_Personal_Transition = 0x00000400,
+    SECURITY_WPA3_Compatibility = 0x00002000
+} sec_t;
 
 /*
 typedef struct {
@@ -121,6 +155,9 @@ typedef struct {
     int last_scanned_channel[MAX_NUM_RADIOS];
     int scan_status[MAX_NUM_RADIOS];
     int scan_results_retries[MAX_NUM_RADIOS];
+    int scan_trigger_retries[MAX_NUM_RADIOS];
+    struct timespec last_scan_time[MAX_NUM_RADIOS];
+    bool scan_failed[MAX_NUM_RADIOS];
     unsigned int        upload_period;
     unsigned int        current_poll_iter;
     instant_msmt_t      inst_msmt;
@@ -143,6 +180,7 @@ typedef struct {
     int clientdiag_sched_arg[MAX_VAP];
     unsigned int clientdiag_sched_interval[MAX_VAP];
     int csi_sched_id;
+    int interop_id;
     unsigned int csi_sched_interval;
     bool radio_presence[MAX_NUM_RADIOS];
     bool is_blaster_running;
@@ -177,6 +215,7 @@ wifi_stats_flag_change
     );
 int radio_stats_flag_change(int radio_index, bool enable);
 int vap_stats_flag_change(int ap_index, bool enable);
+int send_monitor_event(int event, const char *event_data);
 void monitor_enable_instant_msmt(mac_address_t sta_mac, bool enable);
 bool monitor_is_instant_msmt_enabled();
 void instant_msmt_reporting_period(int pollPeriod);
@@ -231,6 +270,7 @@ typedef struct {
 
 typedef struct {
     int scan_complete_task_id;
+    int scan_trigger_task_id;
 } collector_radio_channel_neighbor_data_t;
 
 
