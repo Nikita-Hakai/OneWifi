@@ -946,6 +946,8 @@ webconfig_error_t translate_sta_info_to_em_common(const wifi_vap_info_t *vap, co
     memcpy(vap_row->sta_mac, vap->u.sta_info.mac, sizeof(mac_address_t));
     uint8_mac_to_string_mac( vap_row->sta_mac, mac_str);
     wifi_util_info_print(WIFI_WEBCONFIG, "Backhaul sta mac: %s\n", mac_str);
+    printf("	------->>>>>> Backhaul sta mac: %s\n", mac_str);
+    printf("	------->>>>>> Backhaul sta vap name: %s and vap mode: %d\n", vap->vap_name, vap_row->vap_mode);
     convert_vap_name_to_hault_type(&vap_row->id.haul_type, (char *)vap->vap_name);
 
     // Copy security info (mode/AKMs)
@@ -990,6 +992,7 @@ webconfig_error_t translate_sta_info_to_em_common(const wifi_vap_info_t *vap, co
         vap_row->connect_status = false;
     }
     vap_row->vap_mode = vap->vap_mode;
+    printf("	------->>>>>> Backhaul vap mode END-----: %d\n", vap_row->vap_mode);
 
     return webconfig_error_none;
 }
@@ -1248,6 +1251,7 @@ webconfig_error_t translate_vap_object_to_easymesh_for_dml(webconfig_subdoc_data
                     return webconfig_error_translate_to_easymesh;
                 }
             } else  if (is_vap_mesh_sta(wifi_prop, vap->vap_index) == TRUE) {
+                printf("    --->>>>> bss TRanaltor for DML\n");
                 if (translate_mesh_sta_info_to_em_bss_config(vap, iface_map, em_bss_info, ssid_vid_row, wifi_prop) != webconfig_error_none) {
                     wifi_util_error_print(WIFI_WEBCONFIG,"%s:%d: Translation of mesh sta vap to EM failed for %d\n", __func__, __LINE__, vap->vap_index);
                     return webconfig_error_translate_to_easymesh;
@@ -1371,6 +1375,7 @@ webconfig_error_t translate_vap_object_to_easymesh_bss_info(webconfig_subdoc_dat
                     return webconfig_error_translate_to_easymesh;
                 }
             } else if (is_vap_mesh_sta(wifi_prop, vap->vap_index) == TRUE) {
+                printf("    --->>>>> %s \n",__func__);
                 if (translate_mesh_sta_info_to_em_bss_config(vap, iface_map, vap_info_row, ssid_vid_row, wifi_prop) != webconfig_error_none) {
                     wifi_util_error_print(WIFI_WEBCONFIG,"%s:%d: Translation of mesh sta vap to EM failed for %d\n", __func__, __LINE__, vap->vap_index);
                     return webconfig_error_translate_to_easymesh;
@@ -1497,6 +1502,7 @@ webconfig_error_t translate_per_radio_vap_object_to_easymesh_bss_info(webconfig_
                     return webconfig_error_translate_to_easymesh;
                 }
             } else if (is_vap_mesh_sta(wifi_prop, vap->vap_index) == TRUE) {
+                printf("    --->>>>> %s \n",__func__);
                 if (translate_mesh_sta_info_to_em_bss_config(vap, iface_map, vap_info_row, ssid_vid_row, wifi_prop) != webconfig_error_none) {
                     wifi_util_error_print(WIFI_WEBCONFIG,"%s:%d: Translation of mesh sta vap to EM failed for %d\n", __func__, __LINE__, vap->vap_index);
                     return webconfig_error_translate_to_easymesh;
@@ -2809,3 +2815,4 @@ void webconfig_proto_easymesh_init(webconfig_external_easymesh_t *proto, void *d
     proto->get_bss_info_with_mac = get_bss_with_mac;
     proto->put_scan_results = put_scan_res;
 }
+
