@@ -21,6 +21,10 @@
 #include "he_bus_memory.h"
 #include "he_bus_utils.h"
 
+// Function prototypes to resolve implicit declaration and type conflict errors
+uint32_t get_total_objs_size_from_he_bus_objs(he_bus_data_object_t *p_objs);
+uint32_t get_max_objs_cnt(he_bus_data_object_t *p_objs);
+
 #define VERIFY_NULL_WITH_RC(T)                                                       \
     if (NULL == (T)) {                                                               \
         he_bus_core_error_print("[%s] input parameter: %s is NULL\n", __func__, #T); \
@@ -558,6 +562,7 @@ void free_bus_msg_obj_data(he_bus_data_object_t *p_obj_data)
 he_bus_error_t process_bus_sub_event(he_bus_handle_t handle, int socket_fd, char *comp_name,
     he_bus_data_object_t *p_obj_data)
 {
+    printf("    process_bus_sub_event\n");
     subscription_element_t *p_sub_data;
     sub_payload_data_t sub_recv_data;
 
@@ -630,6 +635,7 @@ he_bus_error_t process_bus_sub_event(he_bus_handle_t handle, int socket_fd, char
 he_bus_error_t process_bus_method_event(he_bus_handle_t handle, char *comp_name,
     he_bus_data_object_t *p_obj_data, he_bus_data_object_t *p_res_objs)
 {
+    printf("    process_bus_method_event\n");
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(comp_name);
     VERIFY_NULL_WITH_RC(p_obj_data);
@@ -666,6 +672,7 @@ he_bus_error_t process_bus_method_event(he_bus_handle_t handle, char *comp_name,
 he_bus_error_t process_bus_get_event(he_bus_handle_t handle, char *comp_name,
     he_bus_data_object_t *p_obj_data, he_bus_raw_data_t *p_res_raw_data)
 {
+    printf("    process_bus_get_event\n");
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(comp_name);
     VERIFY_NULL_WITH_RC(p_obj_data);
@@ -688,7 +695,8 @@ he_bus_error_t process_bus_get_event(he_bus_handle_t handle, char *comp_name,
     } else {
         if (node->cb_table.get_handler != NULL) {
             ELM_LOCK(node->element_mutex);
-	    he_bus_userdata = handle;
+            he_bus_userdata = handle;
+            printf("    trigger callback for get_handler\n");
             status = node->cb_table.get_handler(p_obj_data->name, p_res_raw_data, he_bus_userdata);
             ELM_UNLOCK(node->element_mutex);
         } else {
@@ -703,6 +711,7 @@ he_bus_error_t process_bus_get_event(he_bus_handle_t handle, char *comp_name,
 he_bus_error_t process_bus_set_event(he_bus_handle_t handle, char *comp_name,
     he_bus_data_object_t *p_obj_data)
 {
+    printf("    process_bus_set_event\n");
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(comp_name);
     VERIFY_NULL_WITH_RC(p_obj_data);
@@ -722,7 +731,7 @@ he_bus_error_t process_bus_set_event(he_bus_handle_t handle, char *comp_name,
         return he_bus_error_destination_not_found;
     } else {
         if (node->cb_table.set_handler != NULL) {
-	    he_bus_userdata = handle;
+            he_bus_userdata = handle;
             ELM_LOCK(node->element_mutex);
             status = node->cb_table.set_handler(p_obj_data->name, &p_obj_data->data, he_bus_userdata);
             ELM_UNLOCK(node->element_mutex);
@@ -767,7 +776,10 @@ he_bus_error_t handle_bus_msg_req_data(he_bus_handle_t handle, int fd,
 
     switch (p_obj_data->msg_sub_type) {
         case he_bus_msg_reg_event:
+            // ret = process_bus_reg_elem_event(handle, p_msg_data->component_name, p_obj_data);
 
+            // prepare_rem_payload_bus_msg_data(p_obj_data->name, p_res_data, p_obj_data->msg_sub_type,
+            //     &payload_data, ret);
             break;
         case he_bus_msg_get_event:
             ret = process_bus_get_event(handle, p_msg_data->component_name, p_obj_data,
@@ -835,7 +847,7 @@ he_bus_error_t process_bus_sub_ex_async_res_event(hash_map_t *p_sub_map, char *c
         if (p_sub_data->sub_cb_table.sub_ex_async_handler != NULL) {
             he_bus_core_dbg_print("%s:%d Async subscribe callback is triggered\r\n", __func__,
                 __LINE__);
-	    void *userData = NULL;
+            void *userData = NULL;
             p_sub_data->sub_cb_table.sub_ex_async_handler(p_obj_data->name,
                 (he_bus_error_t)p_obj_data->data.raw_data.u32, userData);
         }

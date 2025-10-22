@@ -949,7 +949,7 @@ he_bus_error_t he_bus_event_sub_to_provider(he_bus_handle_t handle,
     if (msg_sub_type == he_bus_msg_sub_event) {
         he_bus_stretch_buff_t res_data = { 0 };
 
-        ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, HE_BUS_RES_RECV_TIMEOUT_S);
+        ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, HE_BUS_RES_RECV_TIMEOUT_S);
         if (ret != HE_BUS_RETURN_OK) {
             he_bus_core_info_print("%s:%d event:%s subscribe send failure:%d\r\n", __func__,
                 __LINE__, event_name, ret);
@@ -1042,6 +1042,7 @@ he_bus_error_t he_bus_event_sub_ex_async(he_bus_handle_t handle, he_bus_event_su
 // caller needs to free allocated memory
 he_bus_error_t he_bus_get_data(he_bus_handle_t handle, char const *event_name, he_bus_raw_data_t *p_data)
 {
+    printf("NH: he_bus_get_data\n");
     VERIFY_NULL_WITH_RC(event_name);
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(p_data);
@@ -1074,7 +1075,7 @@ he_bus_error_t he_bus_get_data(he_bus_handle_t handle, char const *event_name, h
         return he_bus_error_invalid_input;
     }
 
-    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, HE_BUS_RES_RECV_TIMEOUT_S);
+    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, HE_BUS_RES_RECV_TIMEOUT_S);
     if (ret != HE_BUS_RETURN_OK) {
         he_bus_core_info_print("%s:%d event:%s bus get send failure:%d\r\n", __func__, __LINE__,
             event_name, ret);
@@ -1146,7 +1147,7 @@ he_bus_error_t he_bus_set_data(he_bus_handle_t handle, char const *event_name, h
         return he_bus_error_invalid_input;
     }
 
-    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, HE_BUS_RES_RECV_TIMEOUT_S);
+    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, HE_BUS_RES_RECV_TIMEOUT_S);
     if (ret != HE_BUS_RETURN_OK) {
         he_bus_core_info_print("%s:%d event:%s bus set send failure:%d\r\n", __func__, __LINE__,
             event_name, ret);
@@ -1224,7 +1225,7 @@ he_bus_error_t he_bus_method_invoke_internal(he_bus_handle_t handle, char const 
     }
     free_bus_msg_obj_data(&req_data.data_obj);
 
-    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, timeout);
+    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, timeout);
     if (ret != HE_BUS_RETURN_OK) {
         he_bus_core_info_print("%s:%d event:%s bus get send failure:%d\r\n", __func__, __LINE__,
             event_name, ret);
@@ -1404,8 +1405,51 @@ he_bus_error_t remove_client_all_details(he_bus_handle_t handle, char *comp_name
     return status;
 }
 
-he_bus_error_t he_bus_reg_data_elem(he_bus_handle_t handle, he_bus_data_element_t *p_bus_reg_data,
-    uint32_t num_of_elem)
+#if 0
+// Example: Register data elements from client side
+he_bus_error_t he_bus_client_register_elements(
+    he_bus_handle_t handle,
+    he_bus_data_element_t *elements,
+    uint32_t num_elements)
+{
+    he_bus_raw_data_msg_t req_data = {0};
+    he_bus_stretch_buff_t raw_buff = {0};
+    he_bus_stretch_buff_t res_data = {0};
+    he_bus_raw_data_t payload_data = {0};
+    he_bus_error_t status = he_bus_error_success;
+
+    // Prepare the payload: serialize the array of elements as bytes
+    payload_data.data_type = he_bus_data_type_bytes;
+    payload_data.raw_data.bytes = (uint8_t *)elements;
+    payload_data.raw_data_len = num_elements * sizeof(he_bus_data_element_t);
+
+    printf("Request to insert element [%d]!!\r\n", num_elements);
+
+    // Prepare the message header
+    status = prepare_initial_bus_header(&req_data, handle->component_name, he_bus_msg_request);
+    if (status != he_bus_error_success)
+        return status;
+
+    // Use a dummy name or a relevant namespace string
+    const char reg_name[] = "reg_elements";
+    prepare_rem_payload_bus_msg_data((char *)&reg_name, &req_data, he_bus_msg_reg_event, &payload_data, he_bus_error_success);
+
+    // Serialize the message
+    if (convert_bus_raw_msg_data_to_buffer(&req_data, &raw_buff) != he_bus_error_success) {
+        FREE_BUFF_MEMORY(raw_buff.buff);
+        return he_bus_error_invalid_input;
+    }
+
+    // Send and wait for response
+    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, HE_BUS_RES_RECV_TIMEOUT_S);
+    FREE_BUFF_MEMORY(raw_buff.buff);
+    FREE_BUFF_MEMORY(res_data.buff);
+
+    return (ret == HE_BUS_RETURN_OK) ? he_bus_error_success : he_bus_error_destination_not_reachable;
+}
+#endif
+
+he_bus_error_t he_bus_reg_data_elem(he_bus_handle_t handle, he_bus_data_element_t *p_bus_reg_data, uint32_t num_of_elem)
 {
     VERIFY_NULL_WITH_RC(p_bus_reg_data);
     VERIFY_NULL_WITH_RC(handle);
@@ -1423,6 +1467,9 @@ he_bus_error_t he_bus_reg_data_elem(he_bus_handle_t handle, he_bus_data_element_
             node->data_model_value = data_model_value;
         }
     }
+
+    //printf("\n\n    ######## he_bus_client_register_elements\n\n");
+    //he_bus_client_register_elements(handle, (he_bus_data_element_t*)p_bus_reg_data, num_of_elem);
 
     return HE_BUS_RETURN_OK;
 }

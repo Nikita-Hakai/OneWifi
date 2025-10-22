@@ -43,9 +43,6 @@ extern "C" {
 #define HE_BUS_ERROR_STREAM_CLOSED -1001
 #define HE_BUS_ERROR_MSG_VARIFICATION -1002
 
-#define SOCKET_BROADCAST_SERVER_NAME "/tmp/bus_broadcast_routed"
-#define SOCKET_UNICAST_SERVER_NAME "/tmp/bus_unicast_routed"
-
 typedef struct {
     int fd;
     struct sockaddr_un local_endpoint;
@@ -93,7 +90,7 @@ server_listener_info_t *get_bus_broadcast_server_info(he_bus_handle_t handle);
 he_bus_connection_info_t *get_bus_broadcast_client_info(he_bus_handle_t handle);
 
 int ipc_unix_send_data_and_wait_for_res(he_bus_stretch_buff_t *send_data,
-    he_bus_stretch_buff_t *p_res_data, uint32_t recv_timeout);
+    he_bus_stretch_buff_t *p_res_data, he_bus_name_string_t component_name, uint32_t recv_timeout);
 
 #ifdef __cplusplus
 }

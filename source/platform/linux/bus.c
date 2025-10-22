@@ -53,6 +53,27 @@ bool is_server_process(void)
     return false;
 }
 
+bool is_easymesh_server_process(void)
+{
+    char file_name[64] = { 0 };
+    FILE *fp;
+
+    snprintf(file_name, sizeof(file_name), "/proc/%d/comm", getpid());
+    if ((fp = fopen(file_name, "r")) != NULL) {
+        if (fgets(file_name, sizeof(file_name), fp) != NULL) {
+            fclose(fp);
+
+            if (strstr(file_name, EASYMESH_SERVER_PROCESS_NAME)) {
+                return true;
+            }
+        } else {
+            fclose(fp);
+        }
+    }
+
+    return false;
+}
+
 bus_error_t bus_init(bus_handle_t *handle)
 {
     VERIFY_NULL_WITH_RC(handle);
@@ -66,6 +87,10 @@ bus_error_t bus_init(bus_handle_t *handle)
     if (is_server_process() == true) {
         wifi_util_info_print(WIFI_BUS, "%s:%d: he bus server start:%s\n", __func__, __LINE__, BUS_SERVER_PROCESS_NAME);
         he_bus_server_init(&handle->u.he_bus_handle, BUS_SERVER_PROCESS_NAME);
+        handle->is_bus_init = true;
+    } else if (is_easymesh_server_process() == true) {
+        wifi_util_info_print(WIFI_BUS, "%s:%d: he bus server start:%s\n", __func__, __LINE__, EASYMESH_SERVER_PROCESS_NAME);
+        he_bus_server_init(&handle->u.he_bus_handle, EASYMESH_SERVER_PROCESS_NAME);
         handle->is_bus_init = true;
     }
     wifi_util_info_print(WIFI_BUS, "%s:%d: bus_init() is successful.\n", __func__, __LINE__);
@@ -383,7 +408,17 @@ static bus_error_t bus_remove_table_row(bus_handle_t *handle, char const *name)
 static bus_error_t bus_method_async_invoke(bus_handle_t *handle, char const *param_name, char const *event_name,
     bus_data_obj_t *input_data, wifi_bus_method_async_resp_handler_t cb, uint32_t timeout)
 {
-    return bus_error_success;
+    VERIFY_NULL_WITH_RC(handle);
+    VERIFY_NULL_WITH_RC(event_name);
+
+    he_bus_error_t rc;
+    he_bus_handle_t p_bus_handle = handle->u.he_bus_handle;
+
+    rc = he_bus_async_method_invoke(p_bus_handle, event_name, (he_bus_data_objs_t *)input_data, cb, 10000);
+    if (rc != HE_BUS_RETURN_OK) {
+        wifi_util_error_print(WIFI_BUS,"%s:%d method_invoke is failed:%d\n", __func__, __LINE__, rc);
+    }
+    return (bus_error_t)rc;
 }
 
 static bus_error_t bus_add_table_row(bus_handle_t *handle, char const *name,

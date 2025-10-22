@@ -226,9 +226,9 @@ typedef bus_error_t (*bus_get_handler_t)(char *event_name, raw_data_t *p_data, b
 typedef bus_error_t (*bus_set_handler_t)(char *event_name, raw_data_t *p_data, bus_user_data_t *user_data);
 typedef bus_error_t (*bus_table_add_row_handler_t)(char const* tableName, char const* aliasName, uint32_t* instNum);
 typedef bus_error_t (*bus_table_remove_row_handler_t)(char const* rowName);
-//typedef bus_error_t (*bus_method_handler_t)(char const* method_name, bus_data_prop_t const *in_params,
-    //bus_data_prop_t *out_params, void *async_handle);//we need to do it later
-typedef bus_error_t (*bus_method_handler_t)(char const* methodName, raw_data_t *inParams, raw_data_t *outParams, void *asyncHandle);
+typedef bus_error_t (*bus_method_handler_t)(char const* method_name, bus_data_prop_t const *in_params,
+    bus_data_prop_t *out_params, void *async_handle);//we need to do it later
+//typedef bus_error_t (*bus_method_handler_t)(char const* methodName, raw_data_t *inParams, raw_data_t *outParams, void *asyncHandle);
 typedef bus_error_t (*bus_name_sub_handler_t)(char *eventName, bus_event_sub_action_t action, int32_t interval, bool* autoPublish);
 
 typedef bus_error_t (*bus_event_sub_handler_t)(char *event_name, raw_data_t *p_data, void *userData);

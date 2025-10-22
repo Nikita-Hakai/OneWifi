@@ -36,6 +36,8 @@ typedef struct _he_bus_handle *he_bus_handle_t;
 
 typedef volatile int atomic_int;
 
+#define EASYMESH_SERVER_PROCESS_NAME "onewifi_em_ctrl"
+
 #define HE_BUS_RETURN_ERR -1
 #define HE_BUS_RETURN_OK 0
 
