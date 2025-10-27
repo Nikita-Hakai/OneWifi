@@ -1799,7 +1799,19 @@ static bus_error_t bus_remove_table_row(bus_handle_t *handle, char const *name)
 static bus_error_t bus_method_async_invoke(bus_handle_t *handle, char const *param_name, char const *event_name,
     bus_data_obj_t *input_data, wifi_bus_method_async_resp_handler_t cb, uint32_t timeout)
 {
-    return bus_error_success;
+    rbusError_t rc = bus_error_success;
+    rbusHandle_t p_rbus_handle = handle->u.rbus_handle;
+    rbus_sub_callback_table_t rbus_cb = { 0 };
+    //bus_sub_callback_table_t  user_cb;
+
+    //user_cb.sub_handler = cb;
+    //user_cb.sub_ex_async_handler = async_cb;
+
+    //bus_sub_cb_registration((char *)event_name, &rbus_cb, &user_cb);
+
+    rc = rbusMethod_InvokeAsync(p_rbus_handle, event_name, (rbusObject_t)input_data, cb, timeout);
+
+    return convert_rbus_to_bus_error_code(rc);
 }
 
 void rdkb_bus_desc_init(wifi_bus_desc_t *desc)
