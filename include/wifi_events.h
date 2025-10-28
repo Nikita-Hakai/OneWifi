@@ -111,7 +111,6 @@ typedef enum {
     wifi_event_type_csi_data,
     wifi_event_br_report,
     wifi_event_hal_csa_beacon_frame,
-    wifi_event_hal_wps_results,
     wifi_event_hal_max,
 
     // Commands
