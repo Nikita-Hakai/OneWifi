@@ -1118,6 +1118,7 @@ void bus_data_free(raw_data_t *data)
 /* Caller should responsible to free (call bus_data_free()) the memory */
 static bus_error_t bus_data_get(bus_handle_t *handle, char const *name, raw_data_t *data)
 {
+    printf("\n\n\nbus: bus_data_get() sucess\n");
     rbusValue_t value;
     rbusError_t rc;
     rbusHandle_t p_rbus_handle = handle->u.rbus_handle;
@@ -1800,6 +1801,7 @@ static bus_error_t bus_method_async_invoke(bus_handle_t *handle, char const *par
     bus_data_obj_t *input_data, wifi_bus_method_async_resp_handler_t cb, uint32_t timeout)
 {
     wifi_util_dbg_print(WIFI_BUS, "\n\n%s:%d bus: bus_method_async_invoke()");
+    printf("\n\n\nbus: bus_method_async_invoke() sucess\n");
     rbusError_t rc = bus_error_success;
     rbusHandle_t p_rbus_handle = handle->u.rbus_handle;
     rbus_sub_callback_table_t rbus_cb = { 0 };
@@ -1845,4 +1847,8 @@ void rdkb_bus_desc_init(wifi_bus_desc_t *desc)
     desc->bus_add_table_row_fn = bus_add_table_row;
     desc->bus_remove_table_row_fn = bus_remove_table_row;
     desc->bus_method_async_invoke_fn = bus_method_async_invoke;
+    wifi_util_dbg_print(WIFI_BUS, "\n\n\n%s:%d bus: rdkb_bus_desc_init() sucess",
+        __func__, __LINE__);
+
+        printf("\n\n\nbus: rdkb_bus_desc_init() sucess\n");
 }
