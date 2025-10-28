@@ -1799,6 +1799,7 @@ static bus_error_t bus_remove_table_row(bus_handle_t *handle, char const *name)
 static bus_error_t bus_method_async_invoke(bus_handle_t *handle, char const *param_name, char const *event_name,
     bus_data_obj_t *input_data, wifi_bus_method_async_resp_handler_t cb, uint32_t timeout)
 {
+    wifi_util_dbg_print(WIFI_BUS, "\n\n%s:%d bus: bus_method_async_invoke()");
     rbusError_t rc = bus_error_success;
     rbusHandle_t p_rbus_handle = handle->u.rbus_handle;
     rbus_sub_callback_table_t rbus_cb = { 0 };
@@ -1811,6 +1812,8 @@ static bus_error_t bus_method_async_invoke(bus_handle_t *handle, char const *par
 
     rc = rbusMethod_InvokeAsync(p_rbus_handle, event_name, (rbusObject_t)input_data, cb, timeout);
 
+        wifi_util_dbg_print(WIFI_BUS, "%s:%d bus: bus_method_async_invoke() end, rc: %d\n\n\n",
+        __func__, __LINE__, rc);
     return convert_rbus_to_bus_error_code(rc);
 }
 
