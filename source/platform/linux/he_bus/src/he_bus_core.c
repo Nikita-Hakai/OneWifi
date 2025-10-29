@@ -949,7 +949,7 @@ he_bus_error_t he_bus_event_sub_to_provider(he_bus_handle_t handle,
     if (msg_sub_type == he_bus_msg_sub_event) {
         he_bus_stretch_buff_t res_data = { 0 };
 
-        ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, HE_BUS_RES_RECV_TIMEOUT_S);
+        ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, HE_BUS_RES_RECV_TIMEOUT_S);
         if (ret != HE_BUS_RETURN_OK) {
             he_bus_core_info_print("%s:%d event:%s subscribe send failure:%d\r\n", __func__,
                 __LINE__, event_name, ret);
@@ -1042,6 +1042,7 @@ he_bus_error_t he_bus_event_sub_ex_async(he_bus_handle_t handle, he_bus_event_su
 // caller needs to free allocated memory
 he_bus_error_t he_bus_get_data(he_bus_handle_t handle, char const *event_name, he_bus_raw_data_t *p_data)
 {
+    printf("NH: he_bus_get_data\n");
     VERIFY_NULL_WITH_RC(event_name);
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(p_data);
@@ -1074,7 +1075,7 @@ he_bus_error_t he_bus_get_data(he_bus_handle_t handle, char const *event_name, h
         return he_bus_error_invalid_input;
     }
 
-    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, HE_BUS_RES_RECV_TIMEOUT_S);
+    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, HE_BUS_RES_RECV_TIMEOUT_S);
     if (ret != HE_BUS_RETURN_OK) {
         he_bus_core_info_print("%s:%d event:%s bus get send failure:%d\r\n", __func__, __LINE__,
             event_name, ret);
@@ -1146,7 +1147,7 @@ he_bus_error_t he_bus_set_data(he_bus_handle_t handle, char const *event_name, h
         return he_bus_error_invalid_input;
     }
 
-    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, HE_BUS_RES_RECV_TIMEOUT_S);
+    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, HE_BUS_RES_RECV_TIMEOUT_S);
     if (ret != HE_BUS_RETURN_OK) {
         he_bus_core_info_print("%s:%d event:%s bus set send failure:%d\r\n", __func__, __LINE__,
             event_name, ret);
@@ -1224,7 +1225,7 @@ he_bus_error_t he_bus_method_invoke_internal(he_bus_handle_t handle, char const 
     }
     free_bus_msg_obj_data(&req_data.data_obj);
 
-    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, timeout);
+    int ret = ipc_unix_send_data_and_wait_for_res(&raw_buff, &res_data, handle->component_name, timeout);
     if (ret != HE_BUS_RETURN_OK) {
         he_bus_core_info_print("%s:%d event:%s bus get send failure:%d\r\n", __func__, __LINE__,
             event_name, ret);
@@ -1275,6 +1276,7 @@ he_bus_error_t he_bus_method_invoke(he_bus_handle_t handle, char const *event_na
 
 void *async_method_invoke_thread_func(void *arg)
 {
+    printf("    in async_method_invoke_thread_func\n");
     he_bus_method_invoke_async_data_t *in_data =
         (he_bus_method_invoke_async_data_t *)arg;
     he_bus_error_t status;
@@ -1286,11 +1288,14 @@ void *async_method_invoke_thread_func(void *arg)
         he_bus_core_error_print("%s:%d async method invoke trigger failed\n", __func__, __LINE__);
     }
 
+    printf("    trgger callbackkkk\n");
     //trigger method async callback
     in_data->cb(in_data->method_name, status, &output_data.data_obj, in_data->handle);
 
+    printf("    Freeee daataaa\n");
     free_bus_msg_obj_data(&output_data.data_obj);
-    free_bus_msg_obj_data(&in_data->in_params.data_obj);
+    printf("    Freeee input daataaa\n");
+    //free_bus_msg_obj_data(&in_data->in_params.data_obj);
     he_bus_free(in_data);
     return NULL;
 }
@@ -1423,6 +1428,10 @@ he_bus_error_t he_bus_reg_data_elem(he_bus_handle_t handle, he_bus_data_element_
             node->data_model_value = data_model_value;
         }
     }
+
+    printf("\n\n    ######## he_bus_client_register_elements\n\n");
+    he_bus_client_register_elements(handle, (he_bus_data_element_t*)p_bus_reg_data, num_of_elem);
+
 
     return HE_BUS_RETURN_OK;
 }

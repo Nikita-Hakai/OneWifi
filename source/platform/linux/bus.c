@@ -38,11 +38,34 @@ bool is_server_process(void)
     FILE *fp;
 
     snprintf(file_name, sizeof(file_name), "/proc/%d/comm", getpid());
+    printf("    ########## server process name: %s\n", file_name);
     if ((fp = fopen(file_name, "r")) != NULL) {
         if (fgets(file_name, sizeof(file_name), fp) != NULL) {
             fclose(fp);
 
             if (strstr(file_name, BUS_SERVER_PROCESS_NAME)) {
+                return true;
+            }
+        } else {
+            fclose(fp);
+        }
+    }
+
+    return false;
+}
+
+bool is_easymesh_server_process(void)
+{
+    char file_name[64] = { 0 };
+    FILE *fp;
+
+    snprintf(file_name, sizeof(file_name), "/proc/%d/comm", getpid());
+    printf("    ########## easymesh server process name: %s\n", file_name);
+    if ((fp = fopen(file_name, "r")) != NULL) {
+        if (fgets(file_name, sizeof(file_name), fp) != NULL) {
+            fclose(fp);
+
+            if (strstr(file_name, EASYMESH_SERVER_PROCESS_NAME)) {
                 return true;
             }
         } else {
@@ -65,9 +88,15 @@ bus_error_t bus_init(bus_handle_t *handle)
     bus_desc_init(p_bus_desc);
     if (is_server_process() == true) {
         wifi_util_info_print(WIFI_BUS, "%s:%d: he bus server start:%s\n", __func__, __LINE__, BUS_SERVER_PROCESS_NAME);
+        printf("    ########## he bus server start\n", __func__, __LINE__);
         he_bus_server_init(&handle->u.he_bus_handle, BUS_SERVER_PROCESS_NAME);
         handle->is_bus_init = true;
+    } else if (is_easymesh_server_process() == true) {
+        printf("    ########## is_easymesh_server_process: he bus server start:%s\n", __func__, __LINE__, EASYMESH_SERVER_PROCESS_NAME);
+        he_bus_server_init(&handle->u.he_bus_handle, EASYMESH_SERVER_PROCESS_NAME);
+        handle->is_bus_init = true;
     }
+    printf("    ########## bus init done\n", __func__, __LINE__);
     wifi_util_info_print(WIFI_BUS, "%s:%d: bus_init() is successful.\n", __func__, __LINE__);
 
     return rc;
@@ -75,14 +104,21 @@ bus_error_t bus_init(bus_handle_t *handle)
 
 static bus_error_t bus_open(bus_handle_t *handle, char *component_name)
 {
+    printf("    ########## he_bus_open() init\n");
+
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(component_name);
+
+    printf("    ########## he_bus_open() after null check\n");
 
     he_bus_error_t rc = (he_bus_error_t)bus_error_success;
 
     if ((handle->is_bus_init == true) && (handle->u.he_bus_handle != NULL)) {
         wifi_util_info_print(WIFI_BUS, "%s:%d: Already he_bus_open() completed handle:%p\n", __func__, __LINE__, handle->u.he_bus_handle);
-        return (bus_error_t)rc;
+        
+    printf("    ########## Already he_bus_open() completed handle: %p\n", handle->u.he_bus_handle);
+
+    return (bus_error_t)rc;
     }
 
     rc = he_bus_open(&handle->u.he_bus_handle, component_name);
@@ -92,7 +128,7 @@ static bus_error_t bus_open(bus_handle_t *handle, char *component_name)
     }
     handle->is_bus_init = true;
     wifi_util_info_print(WIFI_BUS, "%s:%d: bus: he_bus_open() is successful. rc:%d, handle:%p\n", __func__, __LINE__, rc, handle->u.he_bus_handle);
-
+printf("    ########## %s:%d: bus: he_bus_open() is successful. rc:%d, handle:%p\n", __func__, __LINE__, rc, handle->u.he_bus_handle);
     return (bus_error_t)rc;
 }
 
@@ -134,6 +170,7 @@ static bus_error_t bus_set(bus_handle_t *handle, char const *name, raw_data_t *p
 
 static bus_error_t bus_data_get(bus_handle_t *handle, char const *name, raw_data_t *p_data)
 {
+    printf("NH: bus_data_get\n");
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(name);
     VERIFY_NULL_WITH_RC(p_data);
@@ -229,8 +266,11 @@ bus_error_t bus_reg_data_elements(bus_handle_t *handle, bus_data_element_t *data
         p_data_elem_map[index].cb_table.table_remove_row_handler  = (he_bus_table_remove_row_handler_t)data_element[index].cb_table.table_remove_row_handler;
         p_data_elem_map[index].cb_table.event_sub_handler  = (he_bus_event_sub_handler_t)data_element[index].cb_table.event_sub_handler;
         p_data_elem_map[index].cb_table.method_handler  = (he_bus_method_handler_t)data_element[index].cb_table.method_handler;
+
+        printf("   Fullanmeeeeee: %s\n", p_data_elem_map[index].full_name);
     }
 
+     
     rc = he_bus_reg_data_elem(p_bus_handle, p_data_elem_map, num_of_element);
 
     //for testing purpose only.
@@ -241,7 +281,7 @@ bus_error_t bus_reg_data_elements(bus_handle_t *handle, bus_data_element_t *data
 }
 
 bus_error_t bus_method_invoke(bus_handle_t *handle, void *paramName, char *event,
-    raw_data_t *input_data, raw_data_t *output_data, uint8_t input_bus_data)
+    bus_data_obj_t *input_data, bus_data_obj_t *output_data, uint8_t input_bus_data)
 {
     VERIFY_NULL_WITH_RC(handle);
     VERIFY_NULL_WITH_RC(event);
@@ -380,10 +420,21 @@ static bus_error_t bus_remove_table_row(bus_handle_t *handle, char const *name)
     return bus_error_success;
 }
 
-static bus_error_t bus_method_async_invoke(bus_handle_t *handle, char const *param_name, char const *event_name,
+bus_error_t bus_method_async_invoke(bus_handle_t *handle, void *param_name, char *event_name,
     bus_data_obj_t *input_data, wifi_bus_method_async_resp_handler_t cb, uint32_t timeout)
 {
-    return bus_error_success;
+    printf("    in bus_method_async_invoke\n");
+    VERIFY_NULL_WITH_RC(handle);
+    VERIFY_NULL_WITH_RC(event_name);
+
+    he_bus_error_t rc;
+    he_bus_handle_t p_bus_handle = handle->u.he_bus_handle;
+
+    rc = he_bus_async_method_invoke(p_bus_handle, event_name, (he_bus_data_objs_t *)input_data, cb, 10000);
+    if (rc != HE_BUS_RETURN_OK) {
+        wifi_util_error_print(WIFI_BUS,"%s:%d method_invoke is failed:%d\n", __func__, __LINE__, rc);
+    }
+    return (bus_error_t)rc;
 }
 
 static bus_error_t bus_add_table_row(bus_handle_t *handle, char const *name,

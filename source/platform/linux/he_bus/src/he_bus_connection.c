@@ -28,6 +28,26 @@
         return HE_BUS_RETURN_ERR;                                                   \
     }
 
+#include <stdio.h>
+#include <string.h>
+
+char g_broadcast_socket_name[64] = {0};
+char g_unicast_socket_name[64] = {};
+
+void get_process_name(char *name_buf, size_t buf_size) {
+    FILE *f = fopen("/proc/self/comm", "r");
+    if (f) {
+        if (fgets(name_buf, buf_size, f) != NULL) {
+            // Remove trailing newline
+            name_buf[strcspn(name_buf, "\n")] = 0;
+        }
+        fclose(f);
+    } else {
+        strncpy(name_buf, "unknown", buf_size);
+        name_buf[buf_size - 1] = '\0';
+    }
+}
+
 int save_connection_info(hash_map_t *conn_info_map, he_bus_connection_info_t *conn_info)
 {
     CONN_VERIFY_NULL_WITH_RC(conn_info_map);
@@ -364,14 +384,20 @@ void *ipc_unix_broadcast_server_start(void *arg)
     he_bus_handle_t handle = (he_bus_handle_t)arg;
     he_bus_conn_info_t *conn_info = get_bus_connection_object(handle);
     server_listener_info_t *p_stream_info = &conn_info->server_info.broadcast;
+    char process_name[64] = {0};
 
-    unlink(SOCKET_BROADCAST_SERVER_NAME);
-    if (bus_server_bind_listener(SOCKET_BROADCAST_SERVER_NAME, &p_stream_info->listener_info) !=
+    get_process_name(process_name, sizeof(process_name));
+    snprintf(g_broadcast_socket_name, sizeof(g_broadcast_socket_name), "/tmp/bus_broadcast_%s", process_name);
+    unlink(g_broadcast_socket_name);
+
+    if (bus_server_bind_listener(g_broadcast_socket_name, &p_stream_info->listener_info) !=
         HE_BUS_RETURN_OK) {
         he_bus_conn_error_print("unix server socket start failure:%s\r\n",
-            SOCKET_BROADCAST_SERVER_NAME);
+            g_broadcast_socket_name);
         return NULL;
     }
+
+    printf("    ########## ipc_unix_broadcast_server_start: %s\n", g_broadcast_socket_name);
 
     p_stream_info->connected_client_info_map = hash_map_create();
 
@@ -459,12 +485,16 @@ void *ipc_unix_unicast_server_start(void *arg)
     he_bus_handle_t handle = (he_bus_handle_t)arg;
     he_bus_conn_info_t *conn_info = get_bus_connection_object(handle);
     server_listener_info_t *p_stream_info = &conn_info->server_info.unicast;
+    char process_name[64] = {0};
+    get_process_name(process_name, sizeof(process_name));
+    
+    snprintf(g_unicast_socket_name, sizeof(g_unicast_socket_name), "/tmp/bus_unicast_%s", process_name);
 
-    unlink(SOCKET_UNICAST_SERVER_NAME);
-    if (bus_server_bind_listener(SOCKET_UNICAST_SERVER_NAME, &p_stream_info->listener_info) !=
+    unlink(g_unicast_socket_name);
+    if (bus_server_bind_listener(g_unicast_socket_name, &p_stream_info->listener_info) !=
         HE_BUS_RETURN_OK) {
         he_bus_conn_error_print("unix server socket start failure:%s\r\n",
-            SOCKET_UNICAST_SERVER_NAME);
+            g_unicast_socket_name);
         return NULL;
     }
 
@@ -592,12 +622,33 @@ void *ipc_unix_broadcast_client_start(void *arg)
     he_bus_conn_info_t *conn_info = get_bus_connection_object(handle);
     he_bus_client_info_t *p_client_info = &conn_info->client_info;
 
-    if (bus_client_bind(SOCKET_BROADCAST_SERVER_NAME, &p_client_info->conn_info) !=
+    char process_name[64] = {0};
+
+    if (handle->component_name && strlen(handle->component_name) > 0) {
+        if ((strcmp(handle->component_name, "Test_TR181") == 0) || (strcmp(handle->component_name, "EasyMesh_Ctrl_Service") == 0)) {
+            strncpy(process_name, "onewifi_em_ctrl", sizeof(process_name) - 1);
+            process_name[sizeof(process_name) - 1] = '\0';
+        } else {
+            strncpy(process_name, "OneWifi", sizeof(process_name) - 1);
+            process_name[sizeof(process_name) - 1] = '\0';
+        }
+    } else {
+    }
+
+    snprintf(g_broadcast_socket_name, sizeof(g_broadcast_socket_name), "/tmp/bus_broadcast_%s", process_name);
+    snprintf(g_unicast_socket_name, sizeof(g_unicast_socket_name), "/tmp/bus_unicast_%s", process_name);
+
+    printf("    ########## ipc_unix_broadcast_client_start: %s\n", g_broadcast_socket_name);
+    printf("    ########## client start: g_unicast_socket_name: %s\n", g_unicast_socket_name);
+
+    if (bus_client_bind(g_broadcast_socket_name, &p_client_info->conn_info) !=
         HE_BUS_RETURN_OK) {
         he_bus_conn_error_print("unix client socket start failure:%s\r\n",
-            SOCKET_BROADCAST_SERVER_NAME);
+            g_broadcast_socket_name);
         return NULL;
     }
+
+    printf("    ########## COMPONENT NAME %s\n", handle->component_name);
     send_bus_initial_msg_info(p_client_info->conn_info.fd, handle->component_name);
 
     while (p_client_info->is_running) {
@@ -629,10 +680,10 @@ void *ipc_unix_broadcast_client_start(void *arg)
             if (ret == HE_BUS_ERROR_STREAM_CLOSED) {
                 p_client_info->conn_info.fd = -1;
                 sleep(20); //@TODO TBD Do we need to trigger retry for server connection ?
-                if (bus_client_bind(SOCKET_BROADCAST_SERVER_NAME, &p_client_info->conn_info) !=
+                if (bus_client_bind(g_broadcast_socket_name, &p_client_info->conn_info) !=
                     HE_BUS_RETURN_OK) {
                     he_bus_conn_error_print("unix client socket start failure:%s\r\n",
-                        SOCKET_BROADCAST_SERVER_NAME);
+                        g_broadcast_socket_name);
                 }
                 continue;
             } else if (ret != HE_BUS_RETURN_OK) {
@@ -698,7 +749,7 @@ static int single_recv_socket_data(he_bus_connection_info_t *conn_info,
 }
 
 int ipc_unix_send_data_and_wait_for_res(he_bus_stretch_buff_t *send_data,
-    he_bus_stretch_buff_t *p_res_data, uint32_t recv_timeout)
+    he_bus_stretch_buff_t *p_res_data, he_bus_name_string_t component_name, uint32_t recv_timeout)
 {
     CONN_VERIFY_NULL_WITH_RC(send_data);
     CONN_VERIFY_NULL_WITH_RC(p_res_data);
@@ -706,10 +757,32 @@ int ipc_unix_send_data_and_wait_for_res(he_bus_stretch_buff_t *send_data,
     he_bus_connection_info_t conn_info;
     he_bus_stretch_buff_t recv_data = { 0 };
     struct timeval timeout;
+    char process_name[64] = {0};
 
-    if (bus_client_bind(SOCKET_UNICAST_SERVER_NAME, &conn_info) != HE_BUS_RETURN_OK) {
+    printf("    ########## COMPONENT NAME %s\n", component_name);
+
+    if (component_name && strlen(component_name) > 0) {
+       if ((strcmp(component_name, "Test_TR181") == 0) || (strcmp(component_name, "EasyMesh_Ctrl_Service") == 0) ||
+                   (strcmp(component_name, "onewifi_em_ctrl") == 0)) {
+            strncpy(process_name, "onewifi_em_ctrl", sizeof(process_name) - 1);
+            process_name[sizeof(process_name) - 1] = '\0';
+        } else {
+            strncpy(process_name, "OneWifi", sizeof(process_name) - 1);
+            process_name[sizeof(process_name) - 1] = '\0';
+        }
+    } else {
+    }
+
+    snprintf(g_broadcast_socket_name, sizeof(g_broadcast_socket_name), "/tmp/bus_broadcast_%s", process_name);
+    snprintf(g_unicast_socket_name, sizeof(g_unicast_socket_name), "/tmp/bus_unicast_%s", process_name);
+
+    printf("    ########## res: g_broadcast_socket_name: %s\n", g_broadcast_socket_name);
+    printf("    ########## res: g_unicast_socket_name: %s\n", g_unicast_socket_name);
+    printf("    ########## ipc_unix_send_data_and_wait_for_res g_unicast_socket_name: %s\n", g_unicast_socket_name);
+    
+    if (bus_client_bind(g_unicast_socket_name, &conn_info) != HE_BUS_RETURN_OK) {
         he_bus_conn_error_print("unix client socket start failure:%s\r\n",
-            SOCKET_UNICAST_SERVER_NAME);
+            g_unicast_socket_name);
         return HE_BUS_RETURN_ERR;
     }
 
@@ -722,7 +795,7 @@ int ipc_unix_send_data_and_wait_for_res(he_bus_stretch_buff_t *send_data,
     if (setsockopt(conn_info.fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt");
         he_bus_conn_error_print("unix client setsockopt is failured:%s\r\n",
-            SOCKET_UNICAST_SERVER_NAME);
+            g_unicast_socket_name);
         close(conn_info.fd);
         return HE_BUS_RETURN_ERR;
     }
