@@ -1470,7 +1470,10 @@ void update_dml_radio_default() {
         radio_cfg[i].ThresholdRange = 100;
         radio_cfg[i].ThresholdInUse = -99;
         radio_cfg[i].ReverseDirectionGrant = 0;
-	radio_cfg[i].AggregationMSDU = 0;
+        radio_cfg[i].AggregationMSDU = 0;
+        for (int j = 0; j < MAX_AMSDU_TID; j++) {
+            radio_cfg[i].AmsduTid[j] = FALSE;
+        }
         radio_cfg[i].AutoBlockAck = 0;
         radio_cfg[i].DeclineBARequest = 0;
         radio_cfg[i].WirelessOnOffButton = 0;
@@ -1492,6 +1495,12 @@ void update_dml_radio_default() {
 #else
             strncpy(radio_cfg[i].SupportedStandards,"g,n,ax",sizeof(radio_cfg[i].SupportedStandards)-1);
 #endif /* CONFIG_IEEE80211BE */
+
+#if defined(_XB10_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_SCXF11BFL_PRODUCT_REQ_)
+            memset(radio_cfg[i].AmsduTid, 1, sizeof(BOOL) * 4);
+#elif defined(_XB8_PRODUCT_REQ_)
+            radio_cfg[i].AmsduTid[0] = 1;
+#endif
         } else if (radio_cfg[i].SupportedFrequencyBands == WIFI_FREQUENCY_5_BAND) {
             radio_cfg[i].MaxBitRate = 4804;
             strncpy(radio_cfg[i].ChannelsInUse,"44",sizeof(radio_cfg[i].ChannelsInUse)-1);
@@ -1500,6 +1509,11 @@ void update_dml_radio_default() {
 #else
             strncpy(radio_cfg[i].SupportedStandards,"a,n,ac,ax",sizeof(radio_cfg[i].SupportedStandards)-1);
 #endif /* CONFIG_IEEE80211BE */
+#if defined(_XB10_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_SCXF11BFL_PRODUCT_REQ_)
+            memset(radio_cfg[i].AmsduTid, 1, sizeof(BOOL) * 4);
+#elif defined(_XB8_PRODUCT_REQ_)
+            radio_cfg[i].AmsduTid[0] = 1;
+#endif
         } else if (radio_cfg[i].SupportedFrequencyBands == WIFI_FREQUENCY_5L_BAND) {
             radio_cfg[i].MaxBitRate = 4804;
             strncpy(radio_cfg[i].ChannelsInUse,"44",sizeof(radio_cfg[i].ChannelsInUse)-1);
@@ -1508,6 +1522,11 @@ void update_dml_radio_default() {
 #else
             strncpy(radio_cfg[i].SupportedStandards,"a,n,ac,ax",sizeof(radio_cfg[i].SupportedStandards)-1);
 #endif /* CONFIG_IEEE80211BE */
+#if defined(_XB10_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_SCXF11BFL_PRODUCT_REQ_)
+            memset(radio_cfg[i].AmsduTid, 1, sizeof(BOOL) * 4);
+#elif defined(_XB8_PRODUCT_REQ_)
+            radio_cfg[i].AmsduTid[0] = 1;
+#endif
         } else if (radio_cfg[i].SupportedFrequencyBands == WIFI_FREQUENCY_5H_BAND) {
             radio_cfg[i].MaxBitRate = 4804;
             strncpy(radio_cfg[i].ChannelsInUse,"149",sizeof(radio_cfg[i].ChannelsInUse)-1);
@@ -1516,6 +1535,11 @@ void update_dml_radio_default() {
 #else
             strncpy(radio_cfg[i].SupportedStandards,"a,n,ac,ax",sizeof(radio_cfg[i].SupportedStandards)-1);
 #endif /* CONFIG_IEEE80211BE */
+#if defined(_XB10_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_SCXF11BFL_PRODUCT_REQ_)
+            memset(radio_cfg[i].AmsduTid, 1, sizeof(BOOL) * 4);
+#elif defined(_XB8_PRODUCT_REQ_)
+            radio_cfg[i].AmsduTid[0] = 1;
+#endif
         } else if (radio_cfg[i].SupportedFrequencyBands == WIFI_FREQUENCY_6_BAND) {
             radio_cfg[i].MaxBitRate = 9608;
             strncpy(radio_cfg[i].ChannelsInUse,"181",sizeof(radio_cfg[i].ChannelsInUse)-1);
@@ -1525,6 +1549,12 @@ void update_dml_radio_default() {
 #else
             strncpy(radio_cfg[i].SupportedStandards,"ax",sizeof(radio_cfg[i].SupportedStandards)-1);
 #endif /* CONFIG_IEEE80211BE */
+#if defined(_XB10_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_SCXF11BFL_PRODUCT_REQ_)
+            memset(radio_cfg[i].AmsduTid, (BOOL)1, sizeof(BOOL) * 5);
+#elif defined(_XB8_PRODUCT_REQ_)
+            radio_cfg[i].AmsduTid[0] = 1;
+            radio_cfg[i].AmsduTid[4] = 1;
+#endif
         }
     }
 }
@@ -1672,10 +1702,36 @@ bool wifi_factory_reset(bool factory_reset_all_vaps)
             }
         }
 
-        //Update DFS RFC for 5GHz radio
+        //Update DFS RFC as disabled for 5GHz radio
         if( (WIFI_FREQUENCY_5_BAND == rcfg.band) || (WIFI_FREQUENCY_5L_BAND == rcfg.band) || (WIFI_FREQUENCY_5H_BAND == rcfg.band) ) {
-            rcfg.DfsEnabled = rfc_param->dfs_rfc;
-            wifi_util_dbg_print(WIFI_DMCLI,"%s:%d: Updated default config for DFS RFC %d\n",__func__, __LINE__, rfc_param->dfs_rfc);
+            wifi_mgr_t *g_wifidb;
+            g_wifidb = get_wifimgr_obj();
+            rdk_wifi_radio_t *l_radio = NULL;
+
+            // Disable DFS and update rfc Config
+            rcfg.DfsEnabled = FALSE;
+            rfc_param->dfs_rfc = FALSE;
+            get_wifidb_obj()->desc.update_rfc_config_fn(0, rfc_param);
+
+            // No need to reset the channel and channel width, as it already done in wifidb_init_radio_config_default,
+            // But need to reset the radar Info data
+            pthread_mutex_lock(&g_wifidb->data_cache_lock);
+            l_radio = find_radio_config_by_index(i);
+            if (l_radio == NULL) {
+                    wifi_util_error_print(WIFI_DMCLI,"%s:%d radio strucutre is not present for radio %d\n",
+                                    __FUNCTION__, __LINE__, i);
+                    pthread_mutex_unlock(&g_wifidb->data_cache_lock);
+                    return FALSE;
+            }
+            l_radio->radarInfo.last_channel = 0;
+            l_radio->radarInfo.num_detected = 0;
+            l_radio->radarInfo.timestamp = 0;
+            pthread_mutex_unlock(&g_wifidb->data_cache_lock);
+
+            // Update PSM
+            wifi_ccsp_desc_t *p_ccsp_desc = &get_wificcsp_obj()->desc;
+            p_ccsp_desc->psm_set_value_fn(DFS_RFC_ENABLE_NAMESPACE, "false");
+            wifi_util_dbg_print(WIFI_DMCLI,"%s:%d: Updated DFS RFC as %d\n",__func__, __LINE__, rfc_param->dfs_rfc);
         }
 
         memcpy((unsigned char *)wifiRadioOperParam,(unsigned char *)&rcfg,sizeof(wifi_radio_operationParam_t));
@@ -1724,7 +1780,7 @@ bool wifi_factory_reset(bool factory_reset_all_vaps)
             wifidb_init_vap_config_default(vap_index,&default_vap,&rdk_default_vap);
             wifidb_init_interworking_config_default(vap_index,&default_vap.u.bss_info.interworking);
             memcpy((unsigned char *)p_vapInfo,(unsigned char *)&default_vap,sizeof(wifi_vap_info_t));
-#if !defined(_WNXL11BWL_PRODUCT_REQ_) && !defined(_PP203X_PRODUCT_REQ_)
+#if !defined(_WNXL11BWL_PRODUCT_REQ_) && !defined(_PP203X_PRODUCT_REQ_) && !defined(_GREXT02ACTS_PRODUCT_REQ_)
             if(rdk_default_vap.exists == false) {
 #if defined(_SR213_PRODUCT_REQ_)
                 if(vap_index != 2 && vap_index != 3) {
@@ -1736,7 +1792,7 @@ bool wifi_factory_reset(bool factory_reset_all_vaps)
                 rdk_default_vap.exists = true;
 #endif /*_SR213_PRODUCT_REQ_*/
             }
-#endif /*!defined(_WNXL11BWL_PRODUCT_REQ_) && !defined(_PP203X_PRODUCT_REQ_)*/
+#endif /*!defined(_WNXL11BWL_PRODUCT_REQ_) && !defined(_PP203X_PRODUCT_REQ_) && !defined(_GREXT02ACTS_PRODUCT_REQ_)*/
             rdk_vap_info->exists = rdk_default_vap.exists;
             set_dml_cache_vap_config_changed(vap_index);
         }

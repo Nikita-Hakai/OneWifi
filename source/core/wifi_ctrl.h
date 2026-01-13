@@ -141,10 +141,16 @@ typedef enum {
     ctrl_webconfig_state_blaster_cfg_complete_rsp_pending = 0x40000,
     ctrl_webconfig_state_vap_mesh_backhaul_sta_cfg_rsp_pending = 0x80000,
     ctrl_webconfig_state_trigger_dml_thread_data_update_pending = 0x100000,
-    ctrl_webconfig_state_max = 0x200000
+    ctrl_webconfig_state_vap_24G_cfg_rsp_pending = 0x200000,
+    ctrl_webconfig_state_vap_5G_cfg_rsp_pending = 0x400000,
+    ctrl_webconfig_state_vap_6G_cfg_rsp_pending = 0x800000,
+    ctrl_webconfig_state_radio_24G_rsp_pending = 0x1000000,
+    ctrl_webconfig_state_radio_5G_rsp_pending = 0x2000000,
+    ctrl_webconfig_state_radio_6G_rsp_pending = 0x4000000,
+    ctrl_webconfig_state_max = 0x8000000
 } wifi_ctrl_webconfig_state_t;
 
-#define CTRL_WEBCONFIG_STATE_MASK   0x1fffff
+#define CTRL_WEBCONFIG_STATE_MASK 0xfffffff
 
 typedef struct {
         char mac_addr[MAC_STR_LEN];
@@ -310,6 +316,7 @@ wifi_ctrl_t *get_wifictrl_obj();
 void deinit_ctrl_monitor(wifi_ctrl_t *ctrl);
 bool is_db_consolidated();
 bool is_db_backup_required();
+bool is_devtype_pod();
 
 UINT getRadioIndexFromAp(UINT apIndex);
 UINT getPrivateApFromRadioIndex(UINT radioIndex);
@@ -388,6 +395,8 @@ wifi_vap_security_t * Get_wifi_object_bss_security_parameter(uint8_t vapIndex);
 wifi_vap_security_t * Get_wifi_object_sta_security_parameter(uint8_t vapIndex);
 char *get_assoc_devices_blob();
 void get_subdoc_name_from_vap_index(uint8_t vap_index, int* subdoc);
+void get_subdoc_type_name_from_ap_index(uint8_t vap_index, int* subdoc);
+
 int dfs_nop_start_timer(void *args);
 int webconfig_send_full_associate_status(wifi_ctrl_t *ctrl);
 

@@ -1922,6 +1922,7 @@ int decode_802_11_frame(webconfig_consumer_t *consumer, unsigned int vap_index, 
     frame_data.frame.len = count;
     frame_data.frame.type = WIFI_MGMT_FRAME_TYPE_ACTION;
     frame_data.frame.dir = wifi_direction_uplink;
+    frame_data.frame.recv_freq = 0;
 
     rbusValue_Init(&value);
     rbusObject_Init(&rdata, NULL);
@@ -1958,7 +1959,7 @@ int decode_pcap(webconfig_consumer_t *consumer, unsigned int vap_index, char *fi
     bool is_mgmt_frame = false;
     wifi_mgmtFrameType_t    mgmt_frame_type = WIFI_MGMT_FRAME_TYPE_INVALID;
 
-    frame_data_t frame_data;
+    frame_data_t frame_data = { 0 };
 
     rbusEvent_t event;
     rbusObject_t rdata;
@@ -2087,8 +2088,10 @@ int decode_pcap(webconfig_consumer_t *consumer, unsigned int vap_index, char *fi
 
         } **/
         if(frames_parsed >end_frame)
-           return 0;
-
+        {
+            fclose(fp);
+            return 0;
+        }
     }
 
     fclose(fp);

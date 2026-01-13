@@ -90,7 +90,6 @@
 #include "ansc_platform.h"
 #include "pack_file.h"
 #include "ccsp_WifiLog_wrapper.h"
-#include <sysevent/sysevent.h>
 #include <sys/sysinfo.h>
 #include "print_uptime.h"
 #include "wifi_passpoint.h"
@@ -1648,10 +1647,10 @@ ANSC_STATUS UpdateJsonParamLegacy
     else if ( strlen(data) != 0)
     {
         json = cJSON_Parse( data );
+        free(data);
         if( !json )
         {
             CcspTraceWarning((  "%s : json file parser error : [%d]\n", __FUNCTION__,__LINE__));
-            free(data);
             return ANSC_STATUS_FAILURE;
         }
         else
@@ -1895,10 +1894,10 @@ ANSC_STATUS UpdateJsonParam
     else if ( strlen(data) != 0)
     {
         json = cJSON_Parse( data );
+        free(data);
         if( !json )
         {
             CcspTraceWarning((  "%s : json file parser error : [%d]\n", __FUNCTION__,__LINE__));
-            free(data);
             return ANSC_STATUS_FAILURE;
         }
         else

@@ -158,7 +158,7 @@ extern void* bus_handle;
 //#define UPLOAD_AP_TELEMETRY_INTERVAL_MS 24*60*60*1000 // 24 Hours
 
 //#define NEIGHBOR_SCAN_RESULT_INTERVAL 5000 //5 seconds
-#define Min_LogInterval 300 //5 minutes
+#define Min_LogInterval 60 //1 minute
 #define Max_LogInterval 3600 //60 minutes
 #define Min_Chan_Util_LogInterval 5 //5 seconds
 
@@ -1364,11 +1364,27 @@ int set_sta_client_mode(int ap_index, char *mac, int key_mgmt, frame_type_t fram
     return RETURN_OK;
 }
 
-
 void process_deauthenticate	(unsigned int ap_index, auth_deauth_dev_t *dev)
 {
+    char buff[2048];
+    char tmp[128];
     sta_key_t sta_key;
     wifi_util_info_print(WIFI_MON, "%s:%d Device:%s deauthenticated on ap:%d with reason : %d\n", __func__, __LINE__, to_sta_key(dev->sta_mac, sta_key), ap_index, dev->reason);
+    /*Wrong password on private, Xfinity Home and LNF SSIDs*/
+    if ((dev->reason == 2) && ( isVapPrivate(ap_index) || isVapXhs(ap_index) || isVapLnfPsk(ap_index) ) ) {
+        get_formatted_time(tmp);
+        snprintf(buff, 2048, "%s WIFI_PASSWORD_FAIL:%d,%s\n", tmp, ap_index + 1, to_sta_key(dev->sta_mac, sta_key));
+        /* send telemetry of password failure */
+        write_to_file(wifi_health_log, buff);
+    }
+    /*ARRISXB6-11979 Possible Wrong WPS key on private SSIDs*/
+    if ((dev->reason == 2 || dev->reason == 14 || dev->reason == 19) && ( isVapPrivate(ap_index) ))  {
+        get_formatted_time(tmp);
+        snprintf(buff, 2048, "%s WIFI_POSSIBLE_WPS_PSK_FAIL:%d,%s,%d\n", tmp, ap_index + 1, to_sta_key(dev->sta_mac, sta_key), dev->reason);
+        /* send telemetry of WPS failure */
+        write_to_file(wifi_health_log, buff);
+    }
+    /*Calling process_disconnect as station is disconncetd from vAP*/
     process_disconnect(ap_index, dev);
 }
 
@@ -1661,6 +1677,28 @@ static void update_subscribe_data(wifi_monitor_data_t *event)
     }
 }
 
+int update_monitor_channel_status_map(wifi_channel_status_event_t *data)
+{
+    int radio_index;
+    if (data == NULL || data->radio_index >= MAX_NUM_RADIOS) {
+        wifi_util_error_print(WIFI_MON, "%s:%d Invalid input data or radio index out of range\n",
+            __func__, __LINE__);
+        return RETURN_ERR;
+    }
+    radio_index = data->radio_index;
+    for (int i = 0; i < MAX_CHANNELS; i++) {
+        if (data->channel_map[i].ch_number == 0)
+            break;
+
+        memcpy(&g_monitor_module.channel_map[radio_index][i], &data->channel_map[i], sizeof(wifi_channelMap_t));
+
+        wifi_util_dbg_print(WIFI_MON, "%s:%d radio_index:%d channel_number:%d channel_state:%d\n",
+            __func__, __LINE__, radio_index, g_monitor_module.channel_map[radio_index][i].ch_number,
+            g_monitor_module.channel_map[radio_index][i].ch_state);
+    }
+    return RETURN_OK;
+}
+
 void *monitor_function  (void *data)
 {
     char event_buff[16] = {0};
@@ -1776,6 +1814,9 @@ void *monitor_function  (void *data)
                     case wifi_event_monitor_set_subscribe:
                         update_subscribe_data(event_data);
                        // subscribe_stats = event_data->u.collect_stats.event_subscribe;
+                    break;
+                    case wifi_event_monitor_channel_status:
+                        update_monitor_channel_status_map(&event_data->u.channel_status_map);
                     break;
                     default:
                     break;
@@ -2038,6 +2079,8 @@ int csi_getClientIpAddress(char *mac, char *ip, char *interface, int check)
 
     if(mac == NULL || ip == NULL || interface == NULL) {
         wifi_util_error_print(WIFI_MON, "%s: Null arguments %p %p %p\n",__func__, mac, ip, interface);
+        if (fd >= 0)
+            close(fd);
         return -1;
     }
     if (fd < 0 ) {
@@ -2244,8 +2287,8 @@ static void send_ping_data(int ap_idx, unsigned char *mac, char *client_ip, char
     int         frame_len;
     int rc = 0;
     bool af_family = TRUE;
-    char        src_ip_str[IP_STR_LEN];
-    char        cli_ip_str[IP_STR_LEN];
+    char        src_ip_str[IP_STR_LEN] = { 0 };
+    char        cli_ip_str[IP_STR_LEN] = { 0 };
 
     if(mac == NULL ) {
         wifi_util_error_print(WIFI_MON, "%s: Mac is NULL\n",__func__);
@@ -2268,7 +2311,7 @@ static void send_ping_data(int ap_idx, unsigned char *mac, char *client_ip, char
         } else {
             if(isValidIpAddress(cli_ip_str, af_family)) {
                 *client_ip_age = 0;
-                strncpy(client_ip, cli_ip_str, IP_STR_LEN);
+                snprintf(client_ip, IP_STR_LEN, "%s", cli_ip_str);
                 wifi_util_info_print(WIFI_MON, "%s Returned ipv4 client address is %s interface %s \n",__func__,  cli_ip_str, cli_interface_str );
             } else {
                 wifi_util_error_print(WIFI_MON, "%s Was not a valid client ip string\n", __func__);
@@ -2283,7 +2326,7 @@ static void send_ping_data(int ap_idx, unsigned char *mac, char *client_ip, char
                 return;
             } else {
                 if(isValidIpAddress(src_ip_str, af_family)) {
-                    strncpy(vap_ip, src_ip_str, IP_STR_LEN);
+                    snprintf(vap_ip, IP_STR_LEN, "%s", src_ip_str);
                     wifi_util_info_print(WIFI_MON, "%s Returned interface ip addr is %s\n", __func__,src_ip_str);
                 } else {
                     wifi_util_error_print(WIFI_MON, "%s Was not a valid client ip string\n", __func__);
@@ -2292,8 +2335,8 @@ static void send_ping_data(int ap_idx, unsigned char *mac, char *client_ip, char
             }
         }
     } else {
-        strncpy(src_ip_str, vap_ip, IP_STR_LEN);
-        strncpy(cli_ip_str, client_ip, IP_STR_LEN);
+        snprintf(src_ip_str, IP_STR_LEN, "%s", vap_ip);
+        snprintf(cli_ip_str, IP_STR_LEN, "%s", client_ip);
     }
     //build a layer 3 packet , tcp ping
     if(af_family) {
@@ -2790,8 +2833,8 @@ int device_disassociated(int ap_index, char *src_mac, char *dest_mac, int type, 
         str_to_mac_bytes(src_mac, grey_list_mac);
         memcpy(greylist_data.sta_mac, &grey_list_mac, sizeof(mac_address_t));
         wifi_util_dbg_print(WIFI_MON," sending Greylist mac to  ctrl queue %s\n",src_mac);
-        push_event_to_ctrl_queue(&greylist_data, sizeof(greylist_data), wifi_event_type_hal_ind, wifi_event_radius_greylist, NULL);
-
+        long long int expiry_time = get_current_time_in_sec() + GREYLIST_TIMEOUT_IN_SECONDS;
+        add_acl_entry_to_vap(src_mac, ap_index, reason, expiry_time, true);
     }
 
     is_sta_active = active_sta_connection_status(ap_index, src_mac);
@@ -2958,8 +3001,7 @@ int device_deauthenticated(int ap_index, char *src_mac, char *dest_mac, int type
     }
 
     if ((ap_reason_code(ap_index, src_mac, dest_mac, type, reason)) != 0) {
-       wifi_util_dbg_print(WIFI_MON,"%s:%d failed in getting the reason code details as mac is null \n", __func__, __LINE__);
-       return -1;
+       wifi_util_dbg_print(WIFI_MON,"%s:%d failed in getting the particular reason code details \n", __func__, __LINE__);
     }
 
     if (reason == WLAN_RADIUS_GREYLIST_REJECT) {
@@ -2968,8 +3010,8 @@ int device_deauthenticated(int ap_index, char *src_mac, char *dest_mac, int type
         greylist_data.reason = reason;
         memcpy(greylist_data.sta_mac, &grey_list_mac, sizeof(mac_address_t));
         wifi_util_dbg_print(WIFI_MON,"Sending Greylist mac to ctrl queue %s\n",src_mac);
-        push_event_to_ctrl_queue(&greylist_data, sizeof(greylist_data), wifi_event_type_hal_ind, wifi_event_radius_greylist, NULL);
-
+        long long int expiry_time = get_current_time_in_sec() + GREYLIST_TIMEOUT_IN_SECONDS;
+        add_acl_entry_to_vap(src_mac, ap_index, reason, expiry_time, true);
     }
 
     is_sta_active = active_sta_connection_status(ap_index, src_mac);
@@ -3573,12 +3615,6 @@ int start_wifi_monitor ()
     if(attrp != NULL)
         pthread_attr_destroy( attrp );
 
-    g_monitor_module.sysevent_fd = get_misc_descriptor()->sysevent_open_fn("127.0.0.1", 0, 0, "wifiMonitor", &g_monitor_module.sysevent_token);
-    if (g_monitor_module.sysevent_fd < 0) {
-        wifi_util_error_print(WIFI_MON, "%s:%d: Failed to open sysevent\n", __func__, __LINE__);
-    } else {
-        wifi_util_info_print(WIFI_MON, "%s:%d: Opened sysevent\n", __func__, __LINE__);
-    }
     if (get_misc_descriptor()->initparodusTask_fn() == -1) {
         //wifi_util_dbg_print(WIFI_MON, "%s:%d: Failed to initialize paroduc task\n", __func__, __LINE__);
 
@@ -3604,7 +3640,6 @@ void deinit_wifi_monitor()
 #endif
     csi_pinger_data_t *pinger_data = NULL, *tmp_pinger_data = NULL;
     mac_addr_str_t mac_str = { 0 };
-    get_misc_descriptor()->sysevent_close_fn(g_monitor_module.sysevent_fd, g_monitor_module.sysevent_token);
     if(g_monitor_module.queue != NULL)
         queue_destroy(g_monitor_module.queue);
 
@@ -3734,10 +3769,10 @@ long get_sys_uptime()
      gettimeofday(&polling_time, NULL);
 
      if ((fp = fopen("/tmp/upload", "r")) == NULL) {
-     /* Minimum LOG Interval we can set is 300 sec, just verify every 5 mins any change in the LogInterval
+     /* Minimum LOG Interval we can set is 60 sec, just verify every 1 min any change in the LogInterval
         if any change in log_interval do the calculation and dump the VAP status */
           time_gap = polling_time.tv_sec - lastpolledtime;
-          if ( time_gap >= 300 )
+          if ( time_gap >= 60 )
           {
                logInterval=readLogInterval();
                lastpolledtime = polling_time.tv_sec;
@@ -3878,10 +3913,14 @@ int collector_postpone_execute_task(void *arg)
 {
     wifi_mon_collector_element_t *elem = (wifi_mon_collector_element_t *)arg;
     wifi_monitor_t *mon_data = (wifi_monitor_t *)get_wifi_monitor();
+    wifi_mgr_t *mgr = get_wifimgr_obj();
     int id = elem->collector_postpone_task_sched_id;
 
-    if ((mon_data->scan_status[elem->args->radio_index] == 1) && (elem->postpone_cnt < MAX_POSTPONE_EXECUTION)) {
-        wifi_util_dbg_print(WIFI_MON, "%s : %d scan running postpone collector : %s\n",__func__,__LINE__, elem->key);
+    if ((mon_data->scan_status[elem->args->radio_index] == 1 ||
+            mgr->channel_change_in_progress[elem->args->radio_index] == true) &&
+        (elem->postpone_cnt < MAX_POSTPONE_EXECUTION)) {
+        wifi_util_dbg_print(WIFI_MON, "%s : %d scan running postpone collector : %s\n", __func__,
+            __LINE__, elem->key);
         scheduler_add_timer_task(mon_data->sched, FALSE, &id, collector_postpone_execute_task, arg, POSTPONE_TIME, 1, FALSE);
         elem->collector_postpone_task_sched_id = id;
         elem->postpone_cnt++;
@@ -3903,11 +3942,12 @@ int collector_execute_task(void *arg)
 {
     wifi_mon_collector_element_t *elem = (wifi_mon_collector_element_t *)arg;
     wifi_monitor_t *mon_data = (wifi_monitor_t *)get_wifi_monitor();
+    wifi_mgr_t *mgr = get_wifimgr_obj();
     int id = elem->collector_postpone_task_sched_id;
 
     if (elem->stat_desc->stats_type == mon_stats_type_radio_channel_stats || 
             elem->stat_desc->stats_type == mon_stats_type_neighbor_stats) {
-        if (mon_data->scan_status[elem->args->radio_index] == 1) {
+        if (mon_data->scan_status[elem->args->radio_index] == 1 || mgr->channel_change_in_progress[elem->args->radio_index] == true) {
             if (elem->collector_postpone_task_sched_id == 0) {
                 wifi_util_dbg_print(WIFI_MON, "%s : %d scan running postpone collector : %s\n",__func__,__LINE__, elem->key);
                 scheduler_add_timer_task(mon_data->sched, FALSE, &id, collector_postpone_execute_task, arg, POSTPONE_TIME, 1, FALSE);
