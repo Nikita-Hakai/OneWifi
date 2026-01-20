@@ -1356,12 +1356,32 @@ typedef struct {
 } radio_metrics_t;
 
 typedef struct {
+    float link_quality_score;
+    char reporting_time[32];
+    int snr;
+    int per;
+    int phy;
+} link_stats_alarm_samples_t;
+
+typedef struct {
+    mac_addr_t sta_mac;
+    char reporting_timestamp[32];
+    float link_quality_threshold;
+    bool alarm_triggered;
+    int sample_count;
+    link_stats_alarm_samples_t alarm_samples[10];
+} link_stats_alarm_report_t;
+
+typedef struct {
     ap_metrics_t vap_metrics;
     int sta_cnt;
     bool is_sta_traffic_stats_enabled;
     assoc_sta_traffic_stats_t *sta_traffic_stats;
     bool is_sta_link_metrics_enabled;
     per_sta_metrics_t *sta_link_metrics;
+    //alarm report fields
+    bool is_alarm_report_enabled;
+    link_stats_alarm_report_t link_report[10];//check later if needed to be changed to dynamic
 } em_vap_metrics_t;
 
 typedef struct {

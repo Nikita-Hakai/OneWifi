@@ -3163,6 +3163,64 @@ webconfig_error_t encode_sta_link_metrics_object(per_sta_metrics_t *sta_metrics,
     return webconfig_error_none;
 }
 
+webconfig_error_t encode_em_link_stats_alarm_object(int sta_cnt, link_stats_alarm_report_t *link_stats_report, cJSON *link_report_obj)
+{
+    cJSON *param_arr, *param_obj, *sample_obj;
+    mac_addr_str_t mac_string;
+    int i = 0;
+
+    if (link_report_obj == NULL) {
+        wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d: Null json object\n", __func__, __LINE__);
+        return webconfig_error_encode;
+    }
+
+    // Create Link Report array
+    param_arr = cJSON_CreateArray();
+    if (param_arr == NULL) {
+        wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d: Array obj creation failed\n", __func__, __LINE__);
+        return webconfig_error_none;
+    }
+
+    cJSON_AddItemToObject(link_report_obj, "LinkReport", param_arr);
+
+    if (link_stats_report == NULL) {
+        wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d: Null link_stats_report\n", __func__, __LINE__);
+        return webconfig_error_none;
+    }
+
+    for (i = 0; i < sta_cnt; i++) {
+        param_obj = cJSON_CreateObject();
+        if (param_obj == NULL) {
+            wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d: Null objects\n", __func__, __LINE__);
+            return webconfig_error_encode;
+        }
+        cJSON_AddItemToArray(param_arr, param_obj);
+
+        to_mac_str(link_stats_report[i].sta_mac, mac_string);
+        cJSON_AddStringToObject(param_obj, "STA MacAddress", mac_string);
+        cJSON_AddStringToObject(param_obj, "ReportingTime", link_stats_report[i].reporting_timestamp);
+        cJSON_AddNumberToObject(param_obj, "Threshold", link_stats_report[i].link_quality_threshold);
+        cJSON_AddBoolToObject(param_obj, "Alarm", link_stats_report[i].alarm_triggered);
+        cJSON *samples_arr = cJSON_CreateArray();
+        cJSON_AddItemToObject(param_obj, "Samples", samples_arr);
+
+        for (int j = 0; j < link_stats_report[i].sample_count; j++) {
+            sample_obj = cJSON_CreateObject();
+            if (sample_obj == NULL) {
+                wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d: json create object failed\n", __func__, __LINE__);
+            }
+
+            cJSON_AddItemToArray(samples_arr, sample_obj);
+            cJSON_AddNumberToObject(sample_obj, "Score", link_stats_report[i].alarm_samples[j].link_quality_score);
+            cJSON_AddStringToObject(sample_obj, "Time", link_stats_report[i].alarm_samples[j].reporting_time);
+            cJSON_AddNumberToObject(sample_obj, "SNR", link_stats_report[i].alarm_samples[j].snr);
+            cJSON_AddNumberToObject(sample_obj, "PER", link_stats_report[i].alarm_samples[j].per);
+            cJSON_AddNumberToObject(sample_obj, "PHY", link_stats_report[i].alarm_samples[j].phy);
+        }
+    }
+    return webconfig_error_none;
+}
+
 webconfig_error_t encode_em_ap_metrics_report_object(rdk_wifi_radio_t *radio,
     em_per_radio_report_t *radio_report, cJSON *emap_metrics_report_obj)
 {
@@ -3279,6 +3337,17 @@ webconfig_error_t encode_em_ap_metrics_report_object(rdk_wifi_radio_t *radio,
         if (ap_metrics->is_sta_link_metrics_enabled == true) {
             encode_sta_link_metrics_object(ap_metrics->sta_link_metrics, ap_metrics->sta_cnt,
                 param_obj);
+        }
+
+        if (ap_metrics->is_alarm_report_enabled == true) {
+            wifi_util_dbg_print(WIFI_WEBCONFIG, "%s:%d: Encoding Link stats Alarm Report Data\n", __func__, __LINE__);
+            // cJSON *alarm_obj = cJSON_CreateObject();
+            // if (alarm_obj == NULL) {
+            //     wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d json object creation failed\n", __func__, __LINE__);
+            //     return webconfig_error_encode;
+            // }
+            // cJSON_AddItemToObject(param_obj, "Alarm Report", alarm_obj);
+            // encode_em_link_stats_alarm_object(ap_metrics->sta_cnt, ap_metrics->link_report, param_obj);
         }
     }
     return webconfig_error_none;

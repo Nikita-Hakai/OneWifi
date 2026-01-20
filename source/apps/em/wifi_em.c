@@ -1519,6 +1519,38 @@ static int ap_report_push_cb(em_ap_report_callback_arg_t *args)
             default:
                 break;
             }
+
+            //todo: integ once data is available, below is hard-coded data for testing
+            /*vap_report->is_alarm_report_enabled = true;
+            for(int a = 0; a < vap_report->sta_cnt; a++) {
+                //i = 0;
+
+                stats = hash_map_get_first(
+                    em_ap_metrics_report_cache.radio_report[radio_index].ap_data[cache_vap_index].client_stats_map);
+                while (stats != NULL) {
+
+                    memcpy(vap_report->link_report[a].sta_mac,
+                        stats->cli_MACAddress, sizeof(mac_addr_t));
+                    wifi_util_dbg_print(WIFI_EM, "%s:%d Preparing Alarm report for sta mac: %s\r\n",
+                        __func__, __LINE__, bss_str);
+                    stats = hash_map_get_next(
+                        em_ap_metrics_report_cache.radio_report[radio_index].ap_data[cache_vap_index].client_stats_map, stats);
+                }
+
+
+                strncpy(vap_report->link_report[a].reporting_timestamp, "9:30:1", sizeof(vap_report->link_report[a].reporting_timestamp));
+                vap_report->link_report[a].link_quality_threshold = a + 0.01;
+                vap_report->link_report[a].alarm_triggered = a + 0.02;
+                vap_report->link_report[a].sample_count = 1;
+
+                for (int b = 0; b < vap_report->link_report[a].sample_count; b++) {
+                    vap_report->link_report[a].alarm_samples[b].link_quality_score = b + 1;
+                    strncpy(vap_report->link_report[a].alarm_samples[b].reporting_time, "9:31.1", sizeof(vap_report->link_report[a].alarm_samples[b].reporting_time));
+                    vap_report->link_report[a].alarm_samples[b].snr = b + 2.01;
+                    vap_report->link_report[a].alarm_samples[b].per = b + 3.01;
+                    vap_report->link_report[a].alarm_samples[b].phy = b + 4.01;
+                }
+            }*/
         }
 
         rad_met = &data->u.decoded.em_ap_metrics_report.radio_reports[i].radio_metrics;
