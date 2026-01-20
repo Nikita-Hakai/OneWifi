@@ -1152,8 +1152,20 @@ typedef struct {
 #define EM_MAX_NEIGHBORS 16
 #define EM_MAX_RESULTS 32
 #define EM_MAX_CHANNELS 64
+#define EM_MAX_STA_PER_BSS 64
 
 typedef char marker_name[32];
+
+typedef struct {
+    int haul_type; //0: Fronthaul, 1: IoT, 2: Configurator, 3: Backhaul, 4: Hotspot, 5: VAP
+    // signed float link_quality_threshold;
+} vap_threshold_policy_t;
+
+typedef struct {
+    char collection_start_time[128];
+    unsigned int reporting_interval;
+    float link_quality_threshold;
+} alarm_report_policy_t;
 
 typedef struct {
     int interval;
@@ -1193,6 +1205,7 @@ typedef struct {
 } radio_metrics_policies_t;
 
 typedef struct {
+    alarm_report_policy_t alarm_report_policy;
     ap_metrics_policy_t ap_metric_policy;
     steering_disallowed_policy_t local_steering_dslw_policy;
     steering_disallowed_policy_t btm_steering_dslw_policy;
@@ -1353,18 +1366,43 @@ typedef struct {
 } radio_metrics_t;
 
 typedef struct {
+    float link_quality_score;
+    char reporting_time[32];
+    int snr;
+    int per;
+    int phy;
+} link_stats_alarm_samples_t;
+
+typedef struct {
+    mac_addr_t sta_mac;
+    char reporting_timestamp[32];
+    float link_quality_threshold;
+    bool alarm_triggered;
+    int sample_count;
+    link_stats_alarm_samples_t alarm_samples[10];
+} link_stats_alarm_report_t;
+
+typedef struct {
     ap_metrics_t vap_metrics;
     int sta_cnt;
     bool is_sta_traffic_stats_enabled;
     assoc_sta_traffic_stats_t *sta_traffic_stats;
     bool is_sta_link_metrics_enabled;
     per_sta_metrics_t *sta_link_metrics;
+    //alarm report fields
+    bool is_alarm_report_enabled;
+    link_stats_alarm_report_t link_report[10];//check later if needed to be changed to dynamic
 } em_vap_metrics_t;
 
 typedef struct {
     int radio_index;
     radio_metrics_t radio_metrics;
     em_vap_metrics_t vap_reports[MAX_NUM_VAP_PER_RADIO];
+} em_per_radio_report_t;
+
+typedef struct {
+    int radio_count;
+    em_per_radio_report_t rad_reports[MAX_NUM_RADIOS];
 } em_ap_metrics_report_t;
 
 #endif
