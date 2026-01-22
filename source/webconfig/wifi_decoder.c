@@ -3783,7 +3783,11 @@ webconfig_error_t decode_link_report(cJSON *json,report_batch_t **out_report)
         /* Mac */
         cJSON *mac = cJSON_GetObjectItem(link_obj, "Mac");
         if (cJSON_IsString(mac)) {
-            strncpy(lr->mac, mac->valuestring, sizeof(lr->mac) - 1);
+                    // client = cJSON_GetObjectItem(mac_object, "MAC");
+        char *tmp_mac = cJSON_GetStringValue(mac);
+        mac_addr_t mac;
+            str_to_mac_bytes(tmp_mac, mac);
+            memcpy(lr->mac, mac, sizeof(mac_addr_t));
         }
 
         /* VapIndex */
@@ -3805,12 +3809,17 @@ webconfig_error_t decode_link_report(cJSON *json,report_batch_t **out_report)
                     sizeof(lr->reporting_time) - 1);
         }
 
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: VapIndex:%d\n", __func__, __LINE__, lr->vap_index);
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: threshold:%f\n", __func__, __LINE__, lr->threshold);
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: alarm:%d\n", __func__, __LINE__, lr->alarm);
+       wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: reporting_time:%s\n", __func__, __LINE__, lr->reporting_time);
         /* Samples */
         cJSON *samples_array = cJSON_GetObjectItem(link_obj, "Samples");
         if (cJSON_IsArray(samples_array)) {
 
             size_t sample_count = cJSON_GetArraySize(samples_array);
             lr->sample_count = sample_count;
+            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: sample_count:%d\n", __func__, __LINE__, lr->sample_count);
             lr->samples = calloc(sample_count, sizeof(sample_t));
 
             for (size_t j = 0; j < sample_count; j++) {
@@ -3836,6 +3845,12 @@ webconfig_error_t decode_link_report(cJSON *json,report_batch_t **out_report)
                 if (cJSON_IsString(v)) {
                     strncpy(s->time, v->valuestring,sizeof(s->time) - 1);
                 }
+
+                wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: score:%f\n", __func__, __LINE__, s->score);
+                wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: snr:%f\n", __func__, __LINE__, s->snr);
+                wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: per:%f\n", __func__, __LINE__, s->per);
+                wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: phy:%f\n", __func__, __LINE__, s->phy);
+                wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: time:%d\n", __func__, __LINE__, s->time);
             }
         }
     }

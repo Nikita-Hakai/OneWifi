@@ -179,7 +179,11 @@ char *linkq_t::get_local_time(char *str, unsigned int len, bool hourformat)
 int linkq_t::reinit(server_arg_t *arg )
 {
    wifi_util_info_print(WIFI_APPS," %s:%d\n", __func__,__LINE__); 
-    m_threshold = arg->threshold;
+
+    wifi_util_info_print(WIFI_APPS," %s:%d before set, m_threshold=%f\n",__func__,__LINE__,m_threshold);
+   m_threshold = arg->threshold;
+   wifi_util_info_print(WIFI_APPS," %s:%d after set, m_threshold=%f\n",__func__,__LINE__,m_threshold);
+    wifi_util_info_print(WIFI_APPS," %s:%d  before set, m_reporting_mult=%d\n",__func__,__LINE__, m_reporting_mult);
     m_reporting_mult = arg->reporting;
    wifi_util_info_print(WIFI_APPS," %s:%d m_reporting_mult =%d m_threshold=%f\n", __func__,__LINE__,m_reporting_mult,m_threshold); 
     return 0;

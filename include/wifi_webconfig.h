@@ -140,7 +140,7 @@ typedef enum {
     webconfig_subdoc_type_em_channel_stats,
     webconfig_subdoc_type_em_sta_link_metrics,
     webconfig_subdoc_type_em_ap_metrics_report,
-    webconfig_subdoc_type_em_link_stats_report, // todo: change to what pramod has
+  //  webconfig_subdoc_type_em_link_stats_report, // todo: change to what pramod has
 #endif
     webconfig_subdoc_type_memwraptool,
     webconfig_subdoc_type_link_report,
