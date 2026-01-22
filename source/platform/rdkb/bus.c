@@ -773,7 +773,7 @@ rbusError_t rbus_set_handler(rbusHandle_t handle, rbusProperty_t property, rbusS
     if (user_cb->set_handler != NULL) {
         ret = get_rbus_property_data(event_name, property, &bus_data);
         if (ret == bus_error_success) {
-#ifndef ONEWIFI_DML_SUPPORT
+#if !defined(ONEWIFI_DML_SUPPORT) || !defined(EASY_MESH_NODE)
             int ret_status = validate_dm_set_parameters(&reg_node_data->data_model_prop, &bus_data);
             if (ret_status != RETURN_OK) {
                 wifi_util_error_print(WIFI_BUS,"%s:%d rbus event:%s, invalid data:%x operation\n", __func__,

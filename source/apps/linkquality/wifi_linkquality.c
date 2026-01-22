@@ -39,6 +39,8 @@ void publish_qmgr_subdoc(const report_batch_t* report)
     //webconfig_subdoc_data_t data_decode = {0};
     bus_error_t status;
     raw_data_t rdata;
+    wifi_app_t *wifi_app = NULL;
+
     wifi_util_error_print(WIFI_CTRL,"[C CALLBACK] %s:%d link_count=%d\n",__func__,__LINE__,report->link_count);
     #if 1
     link_report_t *lr = report->links;
@@ -73,6 +75,10 @@ void publish_qmgr_subdoc(const report_batch_t* report)
     }
  
     memset(data, '\0', sizeof(webconfig_subdoc_data_t));
+    data->u.decoded.hal_cap = get_wifimgr_obj()->hal_cap;
+    for (unsigned int i = 0; i < getNumberRadios(); i++){
+        data->u.decoded.radios[i] = get_wifimgr_obj()->radio_config[i];
+    }
     data->u.decoded.qmgr_report =  (report_batch_t *)report;
     subdoc_type = webconfig_subdoc_type_link_report;
     if (webconfig_encode(&ctrl->webconfig, data, subdoc_type) != webconfig_error_none) {
@@ -86,7 +92,22 @@ void publish_qmgr_subdoc(const report_batch_t* report)
     rdata.raw_data.bytes = (void *)data->u.encoded.raw;
     wifi_util_error_print(WIFI_CTRL,"raw data=%s\n",(char*)rdata.raw_data.bytes);
     rdata.raw_data_len = strlen(data->u.encoded.raw) + 1;
-    status = get_bus_descriptor()->bus_event_publish_fn(&ctrl->handle, WIFI_QUALITY_LINKREPORT, &rdata);
+
+    // wifi_apps_mgr_t *apps_mgr;
+
+    // apps_mgr = &ctrl->apps_mgr;
+    // if (apps_mgr == NULL) {
+    //     wifi_util_dbg_print(WIFI_EM, "%s:%d NULL Pointer \n", __func__, __LINE__);
+    //     free(data);
+    //     return -1;
+    // }
+
+    wifi_app = get_app_by_inst(&ctrl->apps_mgr, wifi_app_inst_link_quality);
+    if (wifi_app == NULL) {
+        wifi_util_error_print(WIFI_EM, "%s:%d NULL Pointer \n", __func__, __LINE__);
+        return;
+    }
+    status = get_bus_descriptor()->bus_event_publish_fn(&wifi_app->ctrl->handle, WIFI_QUALITY_LINKREPORT, &rdata);
     if (status != bus_error_success) {
         wifi_util_error_print(WIFI_CTRL, "%s:%d: bus: bus_event_publish_fn Event failed %d\n",
             __func__, __LINE__, status);
@@ -178,24 +199,60 @@ int link_quality_hal_disconnect(wifi_app_t *apps, void *arg, int len)
     return RETURN_OK;
 
 }
-int link_quality_param_reinit(wifi_app_t *apps, void *arg, int len)
+int link_quality_param_reinit(wifi_app_t *apps, wifi_event_t *arg)
 {
     if (!arg) {
-        wifi_util_error_print(WIFI_CTRL, "%s:%d NULL arg\n", __func__, __LINE__);
+        wifi_util_error_print(WIFI_EM, "%s:%d NULL arg\n", __func__, __LINE__);
         return RETURN_ERR;
     }
 
-    linkquality_data_t *data = (linkquality_data_t *)arg;
+    //linkquality_data_t *data = (linkquality_data_t *)arg;
 
-     server_arg_t *server_arg = &data->server_arg;
-        wifi_util_dbg_print(
-            WIFI_APPS,
-            "%s:%d  threshold=%f reporting=%d\n",
-            __func__, __LINE__,
-            server_arg->threshold,
-            server_arg->reporting
-        );
-        reinit_link_metrics(server_arg);
+    em_config_t *em_config;
+    wifi_event_t *event = NULL;
+    webconfig_subdoc_decoded_data_t *decoded_params = NULL;
+    webconfig_subdoc_data_t *doc;
+
+    if (!arg) {
+        wifi_util_error_print(WIFI_EM, "%s:%d NULL Pointer\n", __func__, __LINE__);
+        return -1;
+    }
+
+    event = arg;
+    doc = (webconfig_subdoc_data_t *)event->u.webconfig_data;
+    decoded_params = &doc->u.decoded;
+    if (decoded_params == NULL) {
+        wifi_util_error_print(WIFI_EM, "%s:%d Decoded data is NULL\n", __func__, __LINE__);
+        return RETURN_ERR;
+    }
+
+    server_arg_t *server_arg = (server_arg_t *)malloc(sizeof(server_arg_t));
+    switch (doc->type) {
+        case webconfig_subdoc_type_em_config:
+            em_config = &decoded_params->em_config;
+            if (em_config == NULL) {
+                wifi_util_error_print(WIFI_EM, "%s:%d NULL pointer \n", __func__, __LINE__);
+                return RETURN_ERR;
+            }
+
+            wifi_util_info_print(WIFI_EM, "%s:%d Received config Interval as %d and threshold as %f\n",
+                __func__, __LINE__, em_config->alarm_report_policy.reporting_interval,
+                em_config->alarm_report_policy.link_quality_threshold);
+            
+            server_arg->reporting = em_config->alarm_report_policy.reporting_interval;
+            server_arg->threshold = em_config->alarm_report_policy.link_quality_threshold;
+
+            wifi_util_info_print(WIFI_EM, "%s:%d reportingl as %d and threshold as %f\n",
+                __func__, __LINE__, server_arg->reporting, server_arg->threshold);
+
+            reinit_link_metrics(server_arg);
+            free(server_arg);
+            break;
+
+        default:
+  
+            break;
+    }
 
     return RETURN_OK;
 }
@@ -218,7 +275,7 @@ int link_quality_event_exec_timeout(wifi_app_t *apps, void *arg, int len)
         stats_arg_t *stats = &data[i].stats;
         wifi_util_dbg_print(
             WIFI_APPS,
-            "%s:%d idx=%d mac=%s per=%f snr=%d phy=%d\n",
+            "%s:%d idx=%d mac=%s per=%f snr=%d phy=%d vap_index=%d\n",
             __func__, __LINE__,
             i,
             stats->mac_str,
@@ -256,22 +313,22 @@ int exec_event_link_quality(wifi_app_t *apps, wifi_event_subtype_t sub_type, voi
     return RETURN_OK;
 }
 
-int exec_event_webconfig_event(wifi_app_t *apps, wifi_event_subtype_t sub_type, void *arg, int len)
+int exec_event_webconfig_event(wifi_app_t *apps, wifi_event_t *event)
 {
     wifi_util_info_print(WIFI_APPS,"Enter %s:%d\n",__func__,__LINE__);
-    switch (sub_type) {
+    switch (event->sub_type) {
         case wifi_event_exec_start:
             break;
 
         case wifi_event_exec_stop:
             break;
 
-        case wifi_event_exec_timeout:
-            link_quality_param_reinit(apps, arg,len);
+        case wifi_event_webconfig_set_data_ovsm:
+            link_quality_param_reinit(apps, event);
             break;
         default:
             wifi_util_error_print(WIFI_APPS, "%s:%d: event not handle %s\r\n", __func__, __LINE__,
-            wifi_event_subtype_to_string(sub_type));
+            wifi_event_subtype_to_string(event->sub_type));
             break;
     }
     return RETURN_OK;
@@ -301,7 +358,7 @@ int link_quality_event(wifi_app_t *app, wifi_event_t *event)
 {
     switch (event->event_type) {
         case wifi_event_type_webconfig:
-            exec_event_webconfig_event(app, event->sub_type, event->u.core_data.msg, event->u.core_data.len);
+            exec_event_webconfig_event(app, event);
             break;
 
         case wifi_event_type_exec:
@@ -356,3 +413,4 @@ int link_quality_deinit(wifi_app_t *app)
 {
     return RETURN_OK;
 }
+

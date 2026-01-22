@@ -354,14 +354,26 @@ void qmgr_t::deinit(mac_addr_str_t mac_str)
 
 int qmgr_t::reinit(server_arg_t *args)
 {
-   linkq_t *lq;
+   linkq_t *lq = NULL;
    wifi_util_info_print(WIFI_APPS," %s:%d\n", __func__,__LINE__);
+   if (args){
+        wifi_util_info_print(WIFI_APPS," %s:%d args->reporting =%d args->threshold=%f\n", __func__,__LINE__,args->reporting,args->threshold); 
+   } else {
+     wifi_util_info_print(WIFI_APPS," %s:%d err\n", __func__,__LINE__); 
+   }
+   
    memcpy(&m_args, args, sizeof(server_arg_t));
+   int count = hash_map_count(m_link_map);
+   wifi_util_info_print(WIFI_APPS," count=%d\n",count);
    lq = (linkq_t *)hash_map_get_first(m_link_map);
-   while (lq != NULL) {
+   while ((lq != NULL)) {
+    if (count > 0){
        lq->reinit(args);
        lq = (linkq_t *)hash_map_get_next(m_link_map, lq);
+       count--;
+    }
   }
+  return 0;
 }
 int qmgr_t::init(stats_arg_t *stats, bool create_flag)
 {
@@ -418,8 +430,10 @@ int qmgr_t::init(stats_arg_t *stats, bool create_flag)
         cJSON_AddItemToArray(dev_arr, create_dev_template(mac_str));
     }
 
+   
     linkq_t *lq = (linkq_t *)hash_map_get(m_link_map, mac_str);
     if (!lq) {
+         wifi_util_info_print(WIFI_CTRL," ==>>> stats->vap_index %d\n", stats->vap_index);
         lq = new linkq_t(mac_str, stats->vap_index);
         hash_map_put(m_link_map, strdup(mac_str), lq);
     }

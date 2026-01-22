@@ -64,7 +64,7 @@ int stop_web_server(const char *path)
 
 int reinit_link_metrics(server_arg_t *ser_arg)
 {
-    wifi_util_info_print(WIFI_APPS,"started add_stats stats->\n"); 
+    wifi_util_info_print(WIFI_APPS,"reinit add_stats stats->\n"); 
     server_arg_t arg;
     memset(&arg, 0, sizeof(server_arg_t));
     strcpy(arg.path, "/www/data");

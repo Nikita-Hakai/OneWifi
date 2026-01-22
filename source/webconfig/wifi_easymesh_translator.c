@@ -1757,7 +1757,7 @@ webconfig_error_t translate_beacon_report_object_to_easymesh_sta_info(webconfig_
 // sta_beacon_report_reponse_t to em_sta_info_t of  easymesh
 webconfig_error_t translate_link_stats_report_object_to_easymesh_sta_info(webconfig_subdoc_data_t *data)
 {
-    em_sta_info_t em_sta_dev_info;
+    em_sta_info_t *em_sta_dev_info, sta_info = {0};
     webconfig_external_easymesh_t *proto;
     em_radio_info_t *radio_info;
     em_bss_info_t *bss_info;
@@ -1775,9 +1775,9 @@ webconfig_error_t translate_link_stats_report_object_to_easymesh_sta_info(webcon
         return webconfig_error_decode;
     }
 
-    vap_index = params->sta_beacon_report.ap_index;
+    link_report_t *link_report;
+
     wifi_prop = &data->u.decoded.hal_cap.wifi_prop;
-    radio_index = get_radio_index_for_vap_index(wifi_prop, vap_index);
 
     proto = (webconfig_external_easymesh_t *)params->external_protos;
     if (proto == NULL) {
@@ -1785,44 +1785,128 @@ webconfig_error_t translate_link_stats_report_object_to_easymesh_sta_info(webcon
         return webconfig_error_translate_to_easymesh;
     }
 
-    radio = &params->radios[radio_index];
-    vap_map = &radio->vaps.vap_map;
+    wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: link_count: %d\n", __func__, __LINE__, params->qmgr_report->link_count);
+    
+    for (i = 0; i < params->qmgr_report->link_count; i++){
+        memset(&sta_info, 0, sizeof(sta_info));
 
-    for (i = 0; i < radio->vaps.num_vaps; i++) {
-        vap = &vap_map->vap_array[i];
-        if (vap->vap_index == vap_index) {
-            break;
+        link_report = &params->qmgr_report->links[i];
+        vap_index = link_report->vap_index;
+        radio_index = get_radio_index_for_vap_index(wifi_prop, vap_index);
+
+        radio = &params->radios[radio_index];
+        vap_map = &radio->vaps.vap_map;
+
+        for (int j = 0; j < radio->vaps.num_vaps; j++) {
+            vap = &vap_map->vap_array[j];
+            if (vap->vap_index == vap_index) {
+                break;
+            } else {
+                vap = NULL;
+            }
         }
+        if (vap == NULL) {
+            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: vap map not found for vap index %d\n", __func__, __LINE__, vap_index);
+            return webconfig_error_translate_to_easymesh;
+        }
+
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: vap index %d\n", __func__, __LINE__, vap_index);
+
+        bss_info = proto->get_bss_info_with_mac(proto->data_model, vap->u.bss_info.bssid);
+
+        mac_addr_str_t bssid_str, rad_str;
+        to_mac_str(vap->u.bss_info.bssid, bssid_str);
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: bssid %s\n", __func__, __LINE__, bssid_str);
+
+        if (bss_info == NULL) {
+            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: bss_info is NULL\n", __func__, __LINE__);
+            return webconfig_error_translate_to_easymesh;
+        }
+
+        if (proto->data_model == NULL)
+        {
+            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: proto->data_model is NULL\n", __func__, __LINE__);
+            return webconfig_error_translate_to_easymesh;
+        }
+
+        radio_info = proto->get_radio_info(proto->data_model, radio_index);
+       // bss_info = proto->get_bss_info(proto->data_model, vap_index);
+
+       to_mac_str(bss_info->bssid.mac, bssid_str);
+       to_mac_str(bss_info->ruid.mac, rad_str);
+        wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: bss_info->bssid.mac=%s and bss_info->ruid.mac=%s\n", __func__, __LINE__,
+                bssid_str, rad_str);
+
+       // em_sta_dev_info = proto->get_sta_info(proto->data_model,  params->qmgr_report->links[i].mac, \
+         //    bss_info->bssid.mac, bss_info->ruid.mac, em_target_sta_map_consolidated);
+        em_sta_dev_info = &sta_info;
+        if (em_sta_dev_info != NULL) {
+            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: sta found \n", __func__, __LINE__);
+                    memcpy(em_sta_dev_info->id, params->qmgr_report->links[i].mac, sizeof(mac_address_t));
+           memcpy(em_sta_dev_info->bssid, bss_info->bssid.mac, sizeof(mac_address_t));
+            memcpy(em_sta_dev_info->radiomac, bss_info->ruid.mac, sizeof(mac_address_t));
+            strncpy(em_sta_dev_info->link_stats_report.reporting_timestamp,
+                link_report->reporting_time,
+                sizeof(em_sta_dev_info->link_stats_report.reporting_timestamp) - 1);
+            em_sta_dev_info->link_stats_report.reporting_timestamp[
+                sizeof(em_sta_dev_info->link_stats_report.reporting_timestamp) - 1] = '\0';
+            em_sta_dev_info->link_stats_report.link_quality_threshold = link_report->threshold;
+            em_sta_dev_info->link_stats_report.alarm_triggered = link_report->alarm;
+            em_sta_dev_info->link_stats_report.sample_count = link_report->sample_count;
+        
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: em_sta_dev_info->id MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", __func__, __LINE__,
+                em_sta_dev_info->id[0], em_sta_dev_info->id[1], em_sta_dev_info->id[2],
+                em_sta_dev_info->id[3], em_sta_dev_info->id[4], em_sta_dev_info->id[5]);
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: em_sta_dev_info->bssid MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", __func__, __LINE__,
+                em_sta_dev_info->bssid[0], em_sta_dev_info->bssid[1], em_sta_dev_info->bssid[2],
+                em_sta_dev_info->bssid[3], em_sta_dev_info->bssid[4], em_sta_dev_info->bssid[5]);
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: em_sta_dev_info->radiomac MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", __func__, __LINE__,
+                em_sta_dev_info->radiomac[0], em_sta_dev_info->radiomac[1], em_sta_dev_info->radiomac[2],
+                em_sta_dev_info->radiomac[3], em_sta_dev_info->radiomac[4], em_sta_dev_info->radiomac[5]);
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: link_stats_report.reporting_timestamp: %s\n", __func__, __LINE__,
+                em_sta_dev_info->link_stats_report.reporting_timestamp);
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: link_quality_threshold: %f\n", __func__, __LINE__,
+                em_sta_dev_info->link_stats_report.link_quality_threshold);
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: alarm_triggered: %u\n", __func__, __LINE__,
+                em_sta_dev_info->link_stats_report.alarm_triggered);
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: sample_count: %u\n", __func__, __LINE__,
+                em_sta_dev_info->link_stats_report.sample_count);
+            
+            for (int cnt = 0; cnt < link_report->sample_count; cnt++) {
+                em_sta_dev_info->link_stats_report.alarm_sample[cnt].link_quality_score = link_report->samples[cnt].score;
+                strncpy(em_sta_dev_info->link_stats_report.alarm_sample[cnt].reporting_time, link_report->samples[cnt].time, sizeof(link_report->samples[cnt].time));
+                em_sta_dev_info->link_stats_report.alarm_sample[cnt].snr = link_report->samples[cnt].snr;
+                em_sta_dev_info->link_stats_report.alarm_sample[cnt].per = link_report->samples[cnt].per;
+                em_sta_dev_info->link_stats_report.alarm_sample[cnt].phy = link_report->samples[cnt].phy;
+            }
+        
+            for (int cnt = 0; cnt < link_report->sample_count; cnt++) {
+                wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: alarm_sample[%d].link_quality_score: %f\n", __func__, __LINE__,
+                    cnt, em_sta_dev_info->link_stats_report.alarm_sample[cnt].link_quality_score);
+                wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: alarm_sample[%d].reporting_time: %s\n", __func__, __LINE__,
+                    cnt, em_sta_dev_info->link_stats_report.alarm_sample[cnt].reporting_time);
+                wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: alarm_sample[%d].snr: %f\n", __func__, __LINE__,
+                    cnt, em_sta_dev_info->link_stats_report.alarm_sample[cnt].snr);
+                wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: alarm_sample[%d].per: %f\n", __func__, __LINE__,
+                    cnt, em_sta_dev_info->link_stats_report.alarm_sample[cnt].per);
+                wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: alarm_sample[%d].phy: %f\n", __func__, __LINE__,
+                    cnt, em_sta_dev_info->link_stats_report.alarm_sample[cnt].phy);
+            }
+            
+            //proto->put_sta_info(proto->data_model, &em_sta_dev_info, em_target_sta_map_consolidated);
+            if (proto == NULL) {
+                wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: proto found null \n", __func__, __LINE__);
+            }
+            if (proto->data_model == NULL) {
+                wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: data_model found null \n", __func__, __LINE__);
+            }
+            proto->put_sta_info(proto->data_model, &sta_info, em_target_sta_map_consolidated);
+        } else {
+            wifi_util_info_print(WIFI_WEBCONFIG, "%s:%d: sta not found\n", __func__, __LINE__);
+        }
+
+
     }
-
-    if (vap == NULL) {
-        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: vap is NULL\n", __func__, __LINE__);
-        return webconfig_error_translate_to_easymesh;
-    }
-
-    if (vap->vap_mode != wifi_vap_mode_ap) {
-        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: vap_mode:%d is not wifi_vap_mode_ap\n",
-            __func__, __LINE__, vap->vap_mode);
-        return webconfig_error_translate_to_easymesh;
-    }
-
-    bss_info = proto->get_bss_info_with_mac(proto->data_model, vap->u.bss_info.bssid);
-
-    if (bss_info == NULL) {
-        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: bss_info is NULL\n", __func__, __LINE__);
-        return webconfig_error_translate_to_easymesh;
-    }
-
-    memcpy(em_sta_dev_info.id, params->sta_beacon_report.mac_addr, sizeof(mac_address_t));
-    memcpy(em_sta_dev_info.bssid, bss_info->bssid.mac, sizeof(mac_address_t));
-    memcpy(em_sta_dev_info.radiomac, bss_info->ruid.mac, sizeof(mac_address_t));
-    em_sta_dev_info.beacon_report_len = params->sta_beacon_report.data_len;
-    em_sta_dev_info.num_beacon_meas_report = params->sta_beacon_report.num_br_data;
-
-    memcpy(em_sta_dev_info.beacon_report_elem, params->sta_beacon_report.data, params->sta_beacon_report.data_len);
-
-    proto->put_sta_info(proto->data_model, &em_sta_dev_info, em_target_sta_map_consolidated);
-
     return webconfig_error_none;
 }
 
@@ -2967,14 +3051,14 @@ webconfig_error_t  translate_to_easymesh_tables(webconfig_subdoc_type_t type, we
                 return webconfig_error_translate_to_easymesh;
             }
             break;
-        case webconfig_subdoc_type_em_link_stats_report:
+#endif
+        case webconfig_subdoc_type_link_report:
             if(translate_link_stats_report_object_to_easymesh_sta_info(data) != webconfig_error_none){
                 wifi_util_error_print(WIFI_WEBCONFIG, 
-                    "%s:%d: webconfig_subdoc_type_em_link_stats_report translation to easymesh failed\n", __func__, __LINE__);
+                    "%s:%d: webconfig_subdoc_type_link_report translation to easymesh failed\n", __func__, __LINE__);
                 return webconfig_error_translate_to_easymesh;
             }
             break;
-#endif
 
         default:
             break;
