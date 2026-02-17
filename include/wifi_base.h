@@ -1178,16 +1178,7 @@ typedef struct {
 typedef char marker_name[32];
 
 typedef struct {
-<<<<<<< HEAD
     char collection_start_time[32];
-=======
-    int haul_type; //0: Fronthaul, 1: IoT, 2: Configurator, 3: Backhaul, 4: Hotspot, 5: VAP
-    // signed float link_quality_threshold;
-} vap_threshold_policy_t;
-
-typedef struct {
-    char collection_start_time[128];
->>>>>>> 3eacce2 (RDKBACCL-1422: Policy fixes and changes for single AP Metrics Report)
     unsigned int reporting_interval;
     float link_quality_threshold;
 } alarm_report_policy_t;
