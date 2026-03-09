@@ -161,14 +161,14 @@ typedef char stats_cfg_id_t[CFG_ID_LEN];
 #define HE_MAC_UL_OFDMA_BIT         2   /* byte 4 */
 #define HE_MAC_DL_OFDMA_BIT         3   /* byte 4 */
 
-#define HE_MAX_MAC_CAPAB_SIZE	  6
-#define HE_MAX_PHY_CAPAB_SIZE	  11
-#define HE_MAX_MCS_CAPAB_SIZE	  12
-#define HE_MAX_PPET_CAPAB_SIZE	  25
+// #define HE_MAX_MAC_CAPAB_SIZE	  6
+// #define HE_MAX_PHY_CAPAB_SIZE	  11
+// #define HE_MAX_MCS_CAPAB_SIZE	  12
+// #define HE_MAX_PPET_CAPAB_SIZE	  25
 
-#define EHT_PHY_CAPAB_LEN        9
-#define EHT_MCS_NSS_CAPAB_LEN    9
-#define EHT_PPE_THRESH_CAPAB_LEN 62
+// #define EHT_PHY_CAPAB_LEN        9
+// #define EHT_MCS_NSS_CAPAB_LEN    9
+// #define EHT_PPE_THRESH_CAPAB_LEN 62
 
 typedef enum {
     wifi_app_inst_blaster = wifi_app_inst_base,
@@ -888,22 +888,22 @@ typedef struct {
     int ap_reason_counts[9];
 } interop_data_t;
 
-typedef struct {
-    BOOL wifi6_supported;                     /**< Whether WiFi6 (HE) is supported */
-    UCHAR phy_cap[HE_MAX_PHY_CAPAB_SIZE];     /**< HE PHY capabilities (HE_MAX_PHY_CAPAB_SIZE = 11) */
-    UCHAR mac_cap[HE_MAX_MAC_CAPAB_SIZE];     /**< HE MAC capabilities (HE_MAX_MAC_CAPAB_SIZE = 4) */
-    UCHAR mcs_nss_set[HE_MAX_MCS_CAPAB_SIZE]; /**< HE MCS NSS set (HE_MAX_MCS_CAPAB_SIZE = 6) */
-    UCHAR ppet[HE_MAX_PPET_CAPAB_SIZE];       /**< HE PPE thresholds (HE_MAX_PPET_CAPAB_SIZE = 7) */
-    //USHORT 6ghz_capa;                       /**< HE 6GHz capabilities */
-} he_radio_capability_t;
+// typedef struct {
+//     BOOL wifi6_supported;                     /**< Whether WiFi6 (HE) is supported */
+//     UCHAR phy_cap[HE_MAX_PHY_CAPAB_SIZE];     /**< HE PHY capabilities (HE_MAX_PHY_CAPAB_SIZE = 11) */
+//     UCHAR mac_cap[HE_MAX_MAC_CAPAB_SIZE];     /**< HE MAC capabilities (HE_MAX_MAC_CAPAB_SIZE = 4) */
+//     UCHAR mcs_nss_set[HE_MAX_MCS_CAPAB_SIZE]; /**< HE MCS NSS set (HE_MAX_MCS_CAPAB_SIZE = 6) */
+//     UCHAR ppet[HE_MAX_PPET_CAPAB_SIZE];       /**< HE PPE thresholds (HE_MAX_PPET_CAPAB_SIZE = 7) */
+//     //USHORT 6ghz_capa;                       /**< HE 6GHz capabilities */
+// } he_radio_capability_t;
 
-typedef struct {
-    BOOL wifi7_supported;                 /**< Whether WiFi7 (EHT) is supported */
-    UCHAR mac_cap;                        /**< EHT MAC capabilities */
-    UCHAR phy_cap[EHT_PHY_CAPAB_LEN];     /**< EHT PHY capabilities (EHT_PHY_CAPAB_LEN = 9) */
-    UCHAR mcs[EHT_MCS_NSS_CAPAB_LEN];     /**< EHT MCS set */
-    UCHAR ppet[EHT_PPE_THRESH_CAPAB_LEN]; /**< EHT PPE thresholds */
-} eht_radio_capability_t;
+// typedef struct {
+//     BOOL wifi7_supported;                 /**< Whether WiFi7 (EHT) is supported */
+//     UCHAR mac_cap;                        /**< EHT MAC capabilities */
+//     UCHAR phy_cap[EHT_PHY_CAPAB_LEN];     /**< EHT PHY capabilities (EHT_PHY_CAPAB_LEN = 9) */
+//     UCHAR mcs[EHT_MCS_NSS_CAPAB_LEN];     /**< EHT MCS set */
+//     UCHAR ppet[EHT_PPE_THRESH_CAPAB_LEN]; /**< EHT PPE thresholds */
+// } eht_radio_capability_t;
 
 typedef struct {
     char    name[16];

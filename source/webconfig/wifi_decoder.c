@@ -4748,7 +4748,7 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
     }
 
     size = cJSON_GetArraySize(obj_wificap);
-
+wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: size:%d\n", __func__, __LINE__, size);
     for (i = 0; i < size; i++) {
          object  = cJSON_GetArrayItem(obj_wificap, i);
          radio_cap = &wifi_prop->radiocap[i];
@@ -4759,6 +4759,7 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
          }
 
          radio_cap->index = value_object->valuedouble;
+         wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap->index:%d for index:%d\n", __func__, __LINE__, radio_cap->index, i);
 
          /*allowed_channels*/
          allowed_channels = cJSON_GetObjectItem(object, "PossibleChannels");
@@ -4805,6 +4806,7 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
         if (value_object != NULL) {
             radio_cap->wifi6_supported = (value_object->type & cJSON_True) ? true : false;
         }
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: WiFi6Supported:%d\n", __func__, __LINE__, radio_cap->wifi6_supported);
 
         value_object = cJSON_GetObjectItem(object, "HEPHYCap");
         if (value_object != NULL && cJSON_IsArray(value_object)) {
@@ -4812,10 +4814,10 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
             if (array_size > sizeof(radio_cap->he_phy_cap)) {
                 array_size = sizeof(radio_cap->he_phy_cap);
             }
-            for (i = 0; i < array_size; i++) {
-                array_item = cJSON_GetArrayItem(value_object, i);
+            for (int j = 0; j < array_size; j++) {
+                array_item = cJSON_GetArrayItem(value_object, j);
                 if (cJSON_IsNumber(array_item)) {
-                    radio_cap->he_phy_cap[i] = (uint8_t)array_item->valuedouble;
+                    radio_cap->he_phy_cap[j] = (uint8_t)array_item->valuedouble;
                 }
             }
         }
@@ -4826,10 +4828,10 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
             if (array_size > sizeof(radio_cap->he_mac_cap)) {
                 array_size = sizeof(radio_cap->he_mac_cap);
             }
-            for (i = 0; i < array_size; i++) {
-                array_item = cJSON_GetArrayItem(value_object, i);
+            for (int j = 0; j < array_size; j++) {
+                array_item = cJSON_GetArrayItem(value_object, j);
                 if (cJSON_IsNumber(array_item)) {
-                    radio_cap->he_mac_cap[i] = (uint8_t)array_item->valuedouble;
+                    radio_cap->he_mac_cap[j] = (uint8_t)array_item->valuedouble;
                 }
             }
         }
@@ -4840,10 +4842,10 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
             if (array_size > sizeof(radio_cap->he_mcs_nss_set)) {
                 array_size = sizeof(radio_cap->he_mcs_nss_set);
             }
-            for (i = 0; i < array_size; i++) {
-                array_item = cJSON_GetArrayItem(value_object, i);
+            for (int j = 0; j < array_size; j++) {
+                array_item = cJSON_GetArrayItem(value_object, j);
                 if (cJSON_IsNumber(array_item)) {
-                    radio_cap->he_mcs_nss_set[i] = (uint8_t)array_item->valuedouble;
+                    radio_cap->he_mcs_nss_set[j] = (uint8_t)array_item->valuedouble;
                 }
             }
         }
@@ -4854,10 +4856,10 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
             if (array_size > sizeof(radio_cap->he_ppet)) {
                 array_size = sizeof(radio_cap->he_ppet);
             }
-            for (i = 0; i < array_size; i++) {
-                array_item = cJSON_GetArrayItem(value_object, i);
+            for (int j = 0; j < array_size; j++) {
+                array_item = cJSON_GetArrayItem(value_object, j);
                 if (cJSON_IsNumber(array_item)) {
-                    radio_cap->he_ppet[i] = (uint8_t)array_item->valuedouble;
+                    radio_cap->he_ppet[j] = (uint8_t)array_item->valuedouble;
                 }
             }
         }
@@ -4885,10 +4887,10 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
             if (array_size > sizeof(radio_cap->eht_phy_cap)) {
                 array_size = sizeof(radio_cap->eht_phy_cap);
             }
-            for (i = 0; i < array_size; i++) {
-                array_item = cJSON_GetArrayItem(value_object, i);
+            for (int j = 0; j < array_size; j++) {
+                array_item = cJSON_GetArrayItem(value_object, j);
                 if (cJSON_IsNumber(array_item)) {
-                    radio_cap->eht_phy_cap[i] = (UCHAR)array_item->valuedouble;
+                    radio_cap->eht_phy_cap[j] = (UCHAR)array_item->valuedouble;
                 }
             }
         }
@@ -4899,10 +4901,10 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
             if (array_size > sizeof(radio_cap->eht_mcs)) {
                 array_size = sizeof(radio_cap->eht_mcs);
             }
-            for (i = 0; i < array_size; i++) {
-                array_item = cJSON_GetArrayItem(value_object, i);
+            for (int j = 0; j < array_size; j++) {
+                array_item = cJSON_GetArrayItem(value_object, j);
                 if (cJSON_IsNumber(array_item)) {
-                    radio_cap->eht_mcs[i] = (UCHAR)array_item->valuedouble;
+                    radio_cap->eht_mcs[j] = (UCHAR)array_item->valuedouble;
                 }
             }
         }
@@ -4913,10 +4915,10 @@ webconfig_error_t decode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
             if (array_size > sizeof(radio_cap->eht_ppet)) {
                 array_size = sizeof(radio_cap->eht_ppet);
             }
-            for (i = 0; i < array_size; i++) {
-                array_item = cJSON_GetArrayItem(value_object, i);
+            for (int j = 0; j < array_size; j++) {
+                array_item = cJSON_GetArrayItem(value_object, j);
                 if (cJSON_IsNumber(array_item)) {
-                    radio_cap->eht_ppet[i] = (UCHAR)array_item->valuedouble;
+                    radio_cap->eht_ppet[j] = (UCHAR)array_item->valuedouble;
                 }
             }
         }

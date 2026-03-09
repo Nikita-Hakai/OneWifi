@@ -392,19 +392,18 @@ webconfig_error_t translate_radio_object_to_easymesh_for_radio(webconfig_subdoc_
 /* Helper function to translate radio capabilities from OneWifi to EasyMesh */
 static webconfig_error_t translate_radio_capability_to_easymesh(wifi_platform_property_t *wifi_prop,
     int radio_index,
-    em_radio_cap_info_t *cap_info,
-    webconfig_external_easymesh_t *proto)
+    em_radio_cap_info_t *cap_info)
 {
     void *radio_cap_ptr;
     wifi_radio_capabilities_t *radio_cap;
     em_radio_wifi6_cap_data_t *wifi6_cap;
     em_wifi7_agent_cap_t *wifi7_cap;
-    em_wifi7_mlo_cap_mandate_tlv_t *wifi7_radio;
+    em_wifi7_mlo_cap_support_tlv_t *wifi7_radio;
     unsigned int i;
     const unsigned char *phy;
     const unsigned char *mac;
 
-    if (cap_info == NULL || proto == NULL || proto->get_radio_cap == NULL) {
+    if (cap_info == NULL) {
         wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: NULL pointer or get_radio_cap not set\n", __func__, __LINE__);
         return webconfig_error_translate_to_easymesh;
     }
@@ -416,12 +415,16 @@ static webconfig_error_t translate_radio_capability_to_easymesh(wifi_platform_pr
     memset(wifi6_cap, 0, sizeof(*wifi6_cap));
 
     if (radio_cap->wifi6_supported) {
-        memcpy(wifi6_cap->ruid, cap_info->ruid.mac, sizeof(mac_address_t));
+        mac_addr_str_t mac_str;
+        uint8_mac_to_string_mac(cap_info->ruid.mac, mac_str);
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap index: %d and mac:%s and radio_index:%d\n", __func__,
+            __LINE__, radio_index, mac_str, radio_index);
 
         phy = radio_cap->he_phy_cap;
         mac = radio_cap->he_mac_cap;
 
-        wifi6_cap->num_role = 1;//todo: Check why hard-coded
+        //AP role
+        wifi6_cap->num_role = 1;
         for (int role = 0; role < wifi6_cap->num_role; role++) {
             wifi6_cap->roles[role].role_head.agent_role = 0; /* AP */
 
@@ -471,22 +474,32 @@ static webconfig_error_t translate_radio_capability_to_easymesh(wifi_platform_pr
 
     memset(wifi7_cap, 0, sizeof(*wifi7_cap));
     if (radio_cap->wifi7_supported) {
-        wifi7_cap->radios_num = 1;//todo: Check why hard-coded
-        wifi7_radio = &wifi7_cap->mlo_cap_mand[0];
+        wifi7_radio = &wifi7_cap->mlo_cap_support;
         memset(wifi7_radio, 0, sizeof(*wifi7_radio));
+        memcpy(wifi7_radio->ruid, cap_info->ruid.mac, sizeof(mac_address_t));
 
         unsigned short eht_mac = (unsigned short)radio_cap->eht_mac_cap;
         (void)eht_mac;
 
-        //todo: check why hard-coded
-        wifi7_radio->ap_str_support    = 1;
-        wifi7_radio->ap_nstr_support   = 0;
-        wifi7_radio->ap_emlsr_support = 0;
-        wifi7_radio->ap_emlmr_support = 0;
-        wifi7_radio->bsta_str_support    = 1;
-        wifi7_radio->bsta_nstr_support   = 0;
-        wifi7_radio->bsta_emlsr_support  = 0;
-        wifi7_radio->bsta_emlmr_support  = 0;
+        /* Extract WiFi 7 Multi-Link modes from mldOperationalCap */
+        wifi_multi_link_modes_t mld_modes = radio_cap->mldOperationalCap;
+
+        /* AP mode support */
+        wifi7_radio->ap_str_support    = (mld_modes & STR) ? 1 : 0;
+        wifi7_radio->ap_nstr_support   = (mld_modes & NSTR) ? 1 : 0;
+        wifi7_radio->ap_emlsr_support  = (mld_modes & eMLSR) ? 1 : 0;
+        wifi7_radio->ap_emlmr_support  = (mld_modes & eMLMR) ? 1 : 0;
+
+        /* BSTA (Backhaul STA) mode support */
+        wifi7_radio->bsta_str_support    = (mld_modes & STR) ? 1 : 0;
+        wifi7_radio->bsta_nstr_support   = (mld_modes & NSTR) ? 1 : 0;
+        wifi7_radio->bsta_emlsr_support  = (mld_modes & eMLSR) ? 1 : 0;
+        wifi7_radio->bsta_emlmr_support  = (mld_modes & eMLMR) ? 1 : 0;
+
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: ap_str_support: %d, ap_nstr_support: %d, ap_emlsr_support: %d, \
+            ap_emlmr_support: %d, bsta_str_support: %d, bsta_nstr_support: %d, bsta_emlsr_support: %d, bsta_emlmr_support: %d\n", __func__, \
+            __LINE__, wifi7_radio->ap_str_support, wifi7_radio->ap_nstr_support, wifi7_radio->ap_emlsr_support, wifi7_radio->ap_emlmr_support, \
+            wifi7_radio->bsta_str_support, wifi7_radio->bsta_nstr_support, wifi7_radio->bsta_emlsr_support, wifi7_radio->bsta_emlmr_support);
     }
 
     return webconfig_error_none;
@@ -610,10 +623,19 @@ webconfig_error_t translate_radio_object_to_easymesh_for_dml(webconfig_subdoc_da
         em_radio_info->associated_sta_link_mterics_inclusion_policy = 0;
         strncpy (em_radio_info->chip_vendor, wifi_prop->manufacturer, strlen(em_radio_info->chip_vendor));
 
-	em_radio_cap_info_t *radio_cap = proto->get_radio_cap(proto->data_model, index);
+        printf("    Translation for radio cap index:%d\n", radio_index);
+	    em_radio_cap_info_t *radio_cap = proto->get_radio_cap(proto->data_model, index);
+        if (radio_cap == NULL) {
+            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap is NULL for index %d\n", __func__, __LINE__, index);
+            return webconfig_error_translate_to_easymesh;
+        }
         memcpy(radio_cap->ruid.mac, em_radio_info->intf.mac, sizeof(mac_address_t));
+        mac_addr_str_t mac_str;
+        uint8_mac_to_string_mac(radio_cap->ruid.mac, mac_str);
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap index: %d and mac:%s and radio_index:%d\n", __func__,
+            __LINE__, index, mac_str, radio_index);
 
-        translate_radio_capability_to_easymesh(wifi_prop, radio_index, radio_cap, proto);
+        translate_radio_capability_to_easymesh(wifi_prop, radio_index, radio_cap);
     }
 
     return webconfig_error_none;

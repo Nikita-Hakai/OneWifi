@@ -2212,25 +2212,25 @@ webconfig_error_t encode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
         cJSON_AddBoolToObject(object, "WiFi6Supported", wifi_prop->radiocap[i].wifi6_supported);
         
         cJSON *he_phy_cap_array = cJSON_CreateArray();
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < HE_MAX_PHY_CAPAB_SIZE; i++) {
             cJSON_AddItemToArray(he_phy_cap_array, cJSON_CreateNumber(wifi_prop->radiocap[i].he_phy_cap[i]));
         }
         cJSON_AddItemToObject(object, "HEPHYCap", he_phy_cap_array);
 
         cJSON *he_mac_cap_array = cJSON_CreateArray();
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < HE_MAX_MAC_CAPAB_SIZE; i++) {
             cJSON_AddItemToArray(he_mac_cap_array, cJSON_CreateNumber(wifi_prop->radiocap[i].he_mac_cap[i]));
         }
         cJSON_AddItemToObject(object, "HEMACCap", he_mac_cap_array);
 
         cJSON *he_mcs_nss_array = cJSON_CreateArray();
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < HE_MAX_MCS_CAPAB_SIZE; i++) {
             cJSON_AddItemToArray(he_mcs_nss_array, cJSON_CreateNumber(wifi_prop->radiocap[i].he_mcs_nss_set[i]));
         }
         cJSON_AddItemToObject(object, "HEMCSNSSSet", he_mcs_nss_array);
 
         cJSON *he_ppet_array = cJSON_CreateArray();
-        for (int i = 0; i < 25; i++) {
+        for (int i = 0; i < HE_MAX_PPET_CAPAB_SIZE; i++) {
             cJSON_AddItemToArray(he_ppet_array, cJSON_CreateNumber(wifi_prop->radiocap[i].he_ppet[i]));
         }
         cJSON_AddItemToObject(object, "HEPPET", he_ppet_array);
@@ -2245,19 +2245,19 @@ webconfig_error_t encode_wifiradiocap(wifi_platform_property_t *wifi_prop, cJSON
         cJSON_AddNumberToObject(object, "EHTMACCap", wifi_prop->radiocap[i].eht_mac_cap);
 
         cJSON *eht_phy_cap_array = cJSON_CreateArray();
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < EHT_PHY_CAPAB_LEN; i++) {
             cJSON_AddItemToArray(eht_phy_cap_array, cJSON_CreateNumber(wifi_prop->radiocap[i].eht_phy_cap[i]));
         }
         cJSON_AddItemToObject(object, "EHTPHYCap", eht_phy_cap_array);
 
         cJSON *eht_mcs_array = cJSON_CreateArray();
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < EHT_MCS_NSS_CAPAB_LEN; i++) {
             cJSON_AddItemToArray(eht_mcs_array, cJSON_CreateNumber(wifi_prop->radiocap[i].eht_mcs[i]));
         }
         cJSON_AddItemToObject(object, "EHTMCS", eht_mcs_array);
 
         cJSON *eht_ppet_array = cJSON_CreateArray();
-        for (int i = 0; i < 62; i++) {
+        for (int i = 0; i < EHT_PPE_THRESH_CAPAB_LEN; i++) {
             cJSON_AddItemToArray(eht_ppet_array, cJSON_CreateNumber(wifi_prop->radiocap[i].eht_ppet[i]));
         }
         cJSON_AddItemToObject(object, "EHTPPET", eht_ppet_array);
