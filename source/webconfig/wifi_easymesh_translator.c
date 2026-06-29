@@ -337,7 +337,9 @@ webconfig_error_t translate_radio_object_to_easymesh_for_radio(webconfig_subdoc_
 
         if (oper_param->band == WIFI_FREQUENCY_2_4_BAND) {
             em_radio_info->band = em_freq_band_24;
-        } else if (oper_param->band == WIFI_FREQUENCY_5_BAND) {
+        } else if (oper_param->band == WIFI_FREQUENCY_5_BAND ||
+                   oper_param->band == WIFI_FREQUENCY_5L_BAND ||
+                   oper_param->band == WIFI_FREQUENCY_5H_BAND) {
             em_radio_info->band = em_freq_band_5;
         } else if (oper_param->band == WIFI_FREQUENCY_6_BAND) {
             em_radio_info->band = em_freq_band_6;
@@ -1112,7 +1114,9 @@ webconfig_error_t translate_radio_object_to_easymesh_for_dml(webconfig_subdoc_da
         //translate frequency band of wifi_freq_bands_t to em_freq_band_t specified in IEEE-1905-1-2013 table 6-23 
         if (oper_param->band == WIFI_FREQUENCY_2_4_BAND) {
             em_radio_info->band = em_freq_band_24;
-        } else if (oper_param->band == WIFI_FREQUENCY_5_BAND) {
+        } else if (oper_param->band == WIFI_FREQUENCY_5_BAND ||
+            oper_param->band == WIFI_FREQUENCY_5L_BAND ||
+            oper_param->band == WIFI_FREQUENCY_5H_BAND) {
             em_radio_info->band = em_freq_band_5;
         } else if (oper_param->band == WIFI_FREQUENCY_6_BAND) {
             em_radio_info->band = em_freq_band_6;
@@ -1174,22 +1178,20 @@ webconfig_error_t translate_radio_object_to_easymesh_for_dml(webconfig_subdoc_da
         em_radio_info->associated_sta_link_mterics_inclusion_policy = 0;
         snprintf(em_radio_info->chip_vendor, sizeof(em_radio_info->chip_vendor), "%s", wifi_prop->manufacturer);
 
-        em_radio_cap_info_t *radio_cap = proto->get_radio_cap(proto->data_model, wifi_prop->radiocap[index].rdk_radio_index);
+        em_radio_cap_info_t *radio_cap = proto->get_radio_cap(proto->data_model, radio_index);
         if (radio_cap == NULL) {
-            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap not found\n", __func__, __LINE__);
+            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap not found for radio_index:%d\n", __func__, __LINE__, radio_index);
             return webconfig_error_translate_to_easymesh;
         }
-        if (radio_iface_map->radio_index == wifi_prop->radiocap[index].rdk_radio_index) {
-            memcpy(radio_cap->ruid.mac, em_radio_info->intf.mac, sizeof(mac_address_t));
-            uint8_mac_to_string_mac(radio_cap->ruid.mac, mac_str);
-            wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap index: %d and mac:%s and radio_index:%d\n", __func__,
-                __LINE__, index, mac_str, radio_index);
+        memcpy(radio_cap->ruid.mac, em_radio_info->intf.mac, sizeof(mac_address_t));
+        uint8_mac_to_string_mac(radio_cap->ruid.mac, mac_str);
+        wifi_util_error_print(WIFI_WEBCONFIG, "%s:%d: radio_cap index: %d and mac:%s and radio_index:%d\n", __func__,
+            __LINE__, index, mac_str, radio_index);
 
-            translate_radio_capability_to_easymesh(wifi_prop, radio_index, radio_cap, oper_param);
+        translate_radio_capability_to_easymesh(wifi_prop, radio_index, radio_cap, oper_param);
 
-            // Populate ch_scan.op_classes[] for Channel Scan Capabilities.
-            fill_scan_cap_op_classes(&wifi_prop->radiocap[radio_index], oper_param, &radio_cap->ch_scan);
-        }
+        // Populate ch_scan.op_classes[] for Channel Scan Capabilities.
+        fill_scan_cap_op_classes(&wifi_prop->radiocap[radio_index], oper_param, &radio_cap->ch_scan);
     }
 
     return webconfig_error_none;
