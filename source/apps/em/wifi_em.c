@@ -3387,6 +3387,7 @@ static int em_send_action_frame(void *data)
     char country[8] = { 0 };
     char client_mac[32];
     char bssid_str[32];
+    char mld_addr_str[32];
     unsigned int global_op_class;
     UCHAR out_dialog = rand() % 256;
     wifi_mgr_t *wifi_mgr = get_wifimgr_obj();
@@ -3398,6 +3399,9 @@ static int em_send_action_frame(void *data)
     wifi_BeaconRequest_t *params = &query->data;
     int ap_index = RETURN_ERR;
 
+    to_mac_str((unsigned char *)query->sta_mac, client_mac);
+    to_mac_str((unsigned char *)params->bssid, bssid_str);
+
     for (unsigned int i = 0; i < num_of_radios; i++) {
         vap_map = (wifi_vap_info_map_t *)get_wifidb_vap_map(i);
         if (vap_map == NULL) {
@@ -3405,6 +3409,11 @@ static int em_send_action_frame(void *data)
         }
 
         for (int j = 0; j < vap_map->num_vaps; j++) {
+            wifi_mld_info_ap_t *mld_info = &vap_map->vap_array[j].u.bss_info.mld_info;
+        to_mac_str((unsigned char *)mld_info->common_info.mld_addr, mld_addr_str);
+
+            wifi_util_dbg_print(WIFI_EM, "%s:%d: Checking BSSID %s against MLD info - mld id %d mld link id %d and mld enable %d mld addr %s\n", __func__, __LINE__,
+                bssid_str, mld_info->common_info.mld_id, mld_info->common_info.mld_link_id, mld_info->common_info.mld_enable, mld_addr_str);
             if (memcmp(params->bssid, vap_map->vap_array[j].u.bss_info.bssid, sizeof(mac_addr_t)) == 0) {
                 ap_index = vap_map->vap_array[j].vap_index;
                 break;
@@ -3416,8 +3425,10 @@ static int em_send_action_frame(void *data)
         }
     }
 
-    to_mac_str((unsigned char *)query->sta_mac, client_mac);
-    to_mac_str((unsigned char *)params->bssid, bssid_str);
+    // wifi_hal_link_interface_t *link = NULL;
+    // wifi_hal_get_mld_link_interface_by_mac(link, query->sta_mac);
+
+  
     wifi_util_dbg_print(WIFI_EM, "%s:%d: Sending beacon query action frame for mac %s with ap_index %d bssid:%s\n", __func__, __LINE__,
         client_mac, ap_index, bssid_str);
     if (ap_index == RETURN_ERR) {
@@ -3502,8 +3513,125 @@ static int em_send_action_frame(void *data)
                 __func__, __LINE__, params->channel, params->opClass);
         }
     }
+    assoc_dev_data_t *assoc_dev_data = NULL;
 
-    wifi_hal_setRMBeaconRequest(ap_index, query->sta_mac, params, &out_dialog);
+    int found = false;
+    rdk_wifi_vap_info_t *rdk_vap_info = NULL;
+    int use_ap_index = -1;
+    wifi_mld_sta_link_info_t *mld_sta_info = NULL;
+    for (int itr = 0; itr < MAX_NUM_RADIOS; itr++) {
+        for (int itrj = 0; itrj < MAX_NUM_VAP_PER_RADIO; itrj++) {
+            found = false;
+            rdk_vap_info = &wifi_mgr->radio_config[itr].vaps.rdk_vap_array[itrj];
+
+            if (rdk_vap_info->associated_devices_lock == NULL) {
+                continue;
+            }
+
+            if (rdk_vap_info->associated_devices_map == NULL) {
+                wifi_util_dbg_print(WIFI_EM, "%s:%d: associated_devices_map is NULL for VAP with index %d\n",
+                    __func__, __LINE__, rdk_vap_info->vap_index);
+                continue;
+            }
+
+            assoc_dev_data = hash_map_get_first(rdk_vap_info->associated_devices_map);
+            while (assoc_dev_data != NULL) {
+                if (memcmp(assoc_dev_data->dev_stats.cli_MACAddress, query->sta_mac, sizeof(query->sta_mac)) != 0) {
+                    assoc_dev_data = hash_map_get_next(rdk_vap_info->associated_devices_map,
+                        assoc_dev_data);
+                    continue;
+                }
+
+                get_sta_stats_info(assoc_dev_data);
+                if (assoc_dev_data->association_link == false) {
+                    wifi_util_dbg_print(WIFI_EM, "%s:%d: Associated device with MAC "MACSTR" is not linked\n",
+                        __func__, __LINE__, MAC2STR(assoc_dev_data->dev_stats.cli_MACAddress));
+                    //continue;
+                } else {
+                    wifi_util_dbg_print(WIFI_EM, "%s:%d: Associated device with MAC "MACSTR" is linked\n",
+                        __func__, __LINE__, MAC2STR(assoc_dev_data->dev_stats.cli_MACAddress));
+                    wifi_util_dbg_print(WIFI_EM, "%s:%d: assoc link_address: "MACSTR" \n",
+                        __func__, __LINE__, MAC2STR(assoc_dev_data->link_address));
+                    for (int i = 0; i < MAX_NUM_RADIOS; i++) {
+                        mld_sta_info = &assoc_dev_data->mld_info.cli_LinkInfo[i];
+                        wifi_util_dbg_print(WIFI_EM, "%s:%d:    mld cli_LinkAddress is "MACSTR"\n",
+                            __func__, __LINE__, MAC2STR(mld_sta_info->cli_LinkAddress));
+                        wifi_util_dbg_print(WIFI_EM, "%s:%d:    mld cli_IsAssocLink is %d\n",
+                            __func__, __LINE__, mld_sta_info->cli_IsAssocLink);
+                        wifi_util_dbg_print(WIFI_EM, "%s:%d:    mld cli_LinkID is %d\n",
+                            __func__, __LINE__, mld_sta_info->cli_LinkID);
+                        wifi_util_dbg_print(WIFI_EM, "%s:%d:    mld cli_VapIndex[%d] end\n",
+                            __func__, __LINE__, mld_sta_info->cli_VapIndex);
+                        if (mld_sta_info->cli_IsAssocLink == true) {
+                            break;
+                        }
+                    }
+                    found = true;
+                    break;
+                }
+                assoc_dev_data = hash_map_get_next(rdk_vap_info->associated_devices_map,
+                    assoc_dev_data);
+            }
+            if (found == true) {
+                wifi_util_dbg_print(WIFI_EM, "%s:%d: Found a linked associated device for VAP with index %d\n",
+                    __func__, __LINE__, rdk_vap_info->vap_index);
+                break;
+            }
+            if (!found) {
+                wifi_util_dbg_print(WIFI_EM, "%s:%d: No associated device is linked for VAP with index %d\n",
+                    __func__, __LINE__, rdk_vap_info->vap_index);
+            }
+        }
+        if (found == true) {
+            wifi_util_dbg_print(WIFI_EM, "%s:%d: Radio loop: Found a linked associated device for one of the VAPs\n",
+                __func__, __LINE__);
+            break;
+        }
+    }
+
+    //rdk_vap_info = getRdkVapInfo(ap_index);
+
+    // if (rdk_vap_info == NULL) {
+    //     wifi_util_dbg_print(WIFI_EM, "%s:%d: No matching VAP found for ap_index %d\n",
+    //         __func__, __LINE__, ap_index);
+    //     return -1;
+    // }
+
+    // if (rdk_vap_info->associated_devices_map != NULL) {
+    //     assoc_dev_data = hash_map_get_first(rdk_vap_info->associated_devices_map);
+    //     while (assoc_dev_data != NULL) {
+    //         get_sta_stats_info(assoc_dev_data);
+    //         // wifi_util_dbg_print(WIFI_EM, "%s:%d: cli_IsAssocLink %d\n",
+    //         //     __func__, __LINE__, assoc_dev_data->mld_info.cli_IsAssocLink);
+    //         if (assoc_dev_data->association_link == false) {
+    //             wifi_util_dbg_print(WIFI_EM, "%s:%d: Associated device with MAC "MACSTR" is not linked\n",
+    //                 __func__, __LINE__, MAC2STR(assoc_dev_data->dev_stats.cli_MACAddress));
+    //             //continue;
+    //         } else {
+    //             wifi_util_dbg_print(WIFI_EM, "%s:%d: Associated device with MAC "MACSTR" is linked\n",
+    //                 __func__, __LINE__, MAC2STR(assoc_dev_data->dev_stats.cli_MACAddress));
+    //             found = true;
+    //             break;
+    //         }
+    //         assoc_dev_data = hash_map_get_next(rdk_vap_info->associated_devices_map,
+    //             assoc_dev_data);
+    //     }
+    //     if (found) {
+    //         wifi_util_dbg_print(WIFI_EM, "%s:%d: Found a linked associated device for VAP with index %d\n",
+    //             __func__, __LINE__, rdk_vap_info->vap_index);
+    //         // break;
+    //     }
+    //     if (!found) {
+    //         wifi_util_dbg_print(WIFI_EM, "%s:%d: No associated device is linked for VAP with index %d\n",
+    //             __func__, __LINE__, rdk_vap_info->vap_index);
+    //     }
+    // }
+
+    // wifi_util_dbg_print(WIFI_EM, "%s:%d: Sending RM Beacon Request with vap_index %d\n", __func__, __LINE__, rdk_vap_info->vap_index);
+    wifi_util_dbg_print(WIFI_EM, "%s:%d: Sending RM Beacon Request with vap_index %d\n", __func__, __LINE__, ap_index);
+    wifi_util_dbg_print(WIFI_EM, "%s:%d: using active link mac: "MACSTR"  \n", __func__, __LINE__, MAC2STR(mld_sta_info->cli_LinkAddress));
+
+    wifi_hal_setRMBeaconRequest(ap_index, mld_sta_info->cli_LinkAddress, params, &out_dialog);
     wifi_util_dbg_print(WIFI_EM, "%s:%d: dialogue token is %d\n", __func__, __LINE__, out_dialog);
 
     return 0;
