@@ -920,10 +920,7 @@ static void config_em_chan_util(wifi_monitor_data_t *data, unsigned int radioInd
 }
 #endif 
 
-UINT wifi_freq_to_op_class(UINT freq)
-{
-	return 0;
-}
+extern UINT wifi_freq_to_op_class(UINT freq);
 
 static int em_prepare_scan_response_data(wifi_provider_response_t *provider_response,
     channel_scan_response_t *scan_response)
