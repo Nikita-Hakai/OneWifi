@@ -6692,6 +6692,13 @@ void wifidb_init_wei_rfc_config_default(wei_rfc_dml_parameters_t *config)
     defaults.radio_6g_max_phy = WEI_RFC_RADIO_6G_MAX_PHY_DEFAULT;
     defaults.wei_diagnostic_enable = true;
 
+    /* HARDCODED FOR TESTING: force WEI_RFC_MAIN + WEI_RFC_GC on by default
+     * (no rbus_set available on this openwrt test setup to flip these at
+     * runtime). Revert before shipping. */
+    defaults.wei_enable = true;
+    defaults.gc.home_enable = true;
+    defaults.gc.client_enable = true;
+
     memcpy(config, &defaults, sizeof(defaults));
 }
 

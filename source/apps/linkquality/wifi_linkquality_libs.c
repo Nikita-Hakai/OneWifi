@@ -120,7 +120,10 @@ static int vap_down_link_stats_rpi(stats_arg_t *stats)
 
 static int periodic_caffinity_stats_update_rpi(stats_arg_t *stats, int len)
 {
-    return 0;
+    /* HARDCODED FOR TESTING: this stub was silently dropping every
+     * CAFFINITY_EVENT before it ever reached lq_ipc_send on this platform
+     * build. Revert to the plain "return 0;" stub before shipping. */
+    return periodic_caffinity_stats_update_impl(stats, len);
 }
 
 static int process_lq_stats_rpi(stats_arg_t *stats, int len)
@@ -210,7 +213,11 @@ wifi_lq_descriptor_t* get_lq_descriptor()
     static wifi_lq_descriptor_t desc;
 
     if (!initialized) {
-#if !defined(_PLATFORM_BANANAPI_R4_) &&  (defined(ONEWIFI_RDKB_APP_SUPPORT) || defined(_GREXT02ACTS_PRODUCT_REQ_))
+        /* HARDCODED FOR TESTING: force the RDKB-style impls below on BPI too
+         * (original guard excluded _PLATFORM_BANANAPI_R4_). Revert to
+         * "#if !defined(_PLATFORM_BANANAPI_R4_) && (defined(ONEWIFI_RDKB_APP_SUPPORT) || defined(_GREXT02ACTS_PRODUCT_REQ_))"
+         * before shipping. */
+#if defined(ONEWIFI_RDKB_APP_SUPPORT) || defined(_GREXT02ACTS_PRODUCT_REQ_) || defined(_PLATFORM_BANANAPI_R4_)
         desc.periodic_caffinity_stats_update_fn = periodic_caffinity_stats_update_impl;
         desc.register_station_mac_fn            = register_station_mac_impl;
         desc.unregister_station_mac_fn          = unregister_station_mac_impl;
@@ -230,7 +237,7 @@ wifi_lq_descriptor_t* get_lq_descriptor()
         desc.stop_link_metrics_fn               = stop_link_metrics;
         desc.disconnect_link_stats_fn           = disconnect_link_stats;
         desc.reinit_link_metrics_fn             = reinit_link_metrics;
-        desc.process_lq_stats_fn                = process_lq_stats_rpi;
+        desc.process_lq_stats_fn                = process_lq_stats_impl;//process_lq_stats_rpi;
         desc.remove_link_stats_fn               = remove_link_stats;
         desc.get_link_metrics_fn                = get_link_metrics;
         desc.set_quality_flags_fn               = set_quality_flags;

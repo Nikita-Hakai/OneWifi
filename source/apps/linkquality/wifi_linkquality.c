@@ -739,12 +739,18 @@ int exec_event_hal_ind(wifi_app_t *apps, wifi_event_subtype_t sub_type, void *ar
     if (sub_type != wifi_event_exec_start &&
         sub_type != wifi_event_exec_stop  &&
         sub_type != wifi_event_exec_timeout) {
+        /* HARDCODED FOR TESTING: bypass the GC RFC gate outright, since
+         * wei_compute_rfc_mask() only reruns on an actual rbus/OVSDB config
+         * change and never fires on plain boot with no rbus_set available.
+         * Revert before shipping. */
+#if 0
         wifi_rfc_dml_parameters_t *rfc_param = get_ctrl_rfc_parameters();
         if (rfc_param == NULL || !(rfc_param->wei_rfc_mask & WEI_RFC_GC)) {
             wifi_util_dbg_print(WIFI_APPS, "%s:%d GC RFC disabled, dropping caffinity event sub_type=%d\n",
                 __func__, __LINE__, sub_type);
             return RETURN_OK;
         }
+#endif
     }
 
     switch (sub_type) {

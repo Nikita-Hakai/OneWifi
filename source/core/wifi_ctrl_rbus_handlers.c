@@ -2347,6 +2347,13 @@ static uint32_t wei_compute_rfc_mask(wei_rfc_dml_parameters_t *cfg)
 {
     uint32_t mask = WEI_RFC_NONE;
 
+    /* HARDCODED FOR TESTING: no rbus_set available on this openwrt test rig,
+     * so force MAIN+GC on regardless of persisted Wifi_Wei_Rfc_Config. Revert
+     * before shipping. */
+    cfg->wei_enable = true;
+    cfg->gc.home_enable = true;
+    cfg->gc.client_enable = true;
+
     if (!cfg->wei_enable) {
         return mask;
     }
