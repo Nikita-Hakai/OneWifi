@@ -192,7 +192,8 @@ typedef enum {
     wifi_app_inst_link_quality = wifi_app_inst_base << 20,
     wifi_app_inst_wifi_sensing = wifi_app_inst_base << 21,
     wifi_app_inst_multiap = wifi_app_inst_base << 22,
-    wifi_app_inst_max = wifi_app_inst_base << 23
+    wifi_app_inst_easymesh_websocket = wifi_app_inst_base << 23,
+    wifi_app_inst_max = wifi_app_inst_base << 24
 } wifi_app_inst_t;
 
 typedef struct {
@@ -1540,7 +1541,7 @@ typedef struct {
 
 typedef struct {
     mac_addr_t sta_mac;
-    unsigned char client_type[32];
+    char client_type[32];
     assoc_sta_link_metrics_t assoc_sta_link_metrics;
     error_code_t error_code;
     assoc_sta_ext_link_metrics_t assoc_sta_ext_link_metrics;

@@ -4992,6 +4992,7 @@ void bus_register_handlers(wifi_ctrl_t *ctrl)
         wifi_util_error_print(WIFI_CTRL, "%s bus: bus_regDataElements failed\n", __FUNCTION__);
     }
 
+    wifi_util_error_print(WIFI_CTRL, "PAVI Registered the elements\n");
     /* WEI RFC namespace (Device.X_RDKCENTRAL-COM_WEI.*), table-driven so a new
      * WEI RFC parameter only needs one row in g_wei_param_table. */
     {

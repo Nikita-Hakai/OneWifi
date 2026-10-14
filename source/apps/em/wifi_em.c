@@ -800,7 +800,7 @@ static int wei_assoc_client_data_response(wifi_app_t *app, wifi_provider_respons
     }
 
     for (unsigned int count = 0; count < provider_response->stat_array_size; count++) {
-        wei_data_t wei_data = {0};
+        stats_arg_t wei_data = {0};
         sta_data_t *sta_data = &sta_assoc_stats[count];
 
         wifi_util_dbg_print(WIFI_EM, "%s:%d: sta_data's cli assoc status for a mlo client: 0x%x cli_Active %d\n", __func__, __LINE__, sta_data->assoc_link, sta_data->dev_stats.cli_Active);
@@ -2313,7 +2313,7 @@ cleanup:
     // Cleanup allocated memory
     if (data != NULL) {
         for (int j = 0; j < req_radio_count; j++) {
-            for (unsigned int i = 0; i < radio->vaps.num_vaps && i < MAX_NUM_VAP_PER_RADIO; i++) {
+            for (unsigned int i = 0; i < MAX_NUM_VAP_PER_RADIO; i++) {
                 vap_report = &data->u.decoded.em_ap_metrics_report.radio_reports[j].vap_reports[i];
                 if (vap_report->sta_link_metrics != NULL) {
                     free(vap_report->sta_link_metrics);
