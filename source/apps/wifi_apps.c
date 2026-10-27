@@ -387,14 +387,6 @@ wifi_app_descriptor_t app_desc[] = {
         em_init, em_event, em_deinit,
         NULL,NULL
     },
-    {
-        wifi_app_inst_easymesh_websocket, 0,
-        wifi_event_type_monitor | wifi_event_type_webconfig | wifi_event_type_hal_ind | wifi_event_type_command,
-        true, true,
-        "Easy Mesh Websocket",
-        em_websocket_init, em_websocket_event, em_websocket_deinit,
-        NULL,NULL 
-    },
 #endif
 #if ONEWIFI_CSI_APP_SUPPORT
     {

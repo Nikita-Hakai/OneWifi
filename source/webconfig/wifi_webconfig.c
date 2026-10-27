@@ -358,7 +358,6 @@ static webconfig_error_t translate_to_proto(webconfig_subdoc_type_t type, webcon
 	return(translate_to_easymesh_tables(type, data));
     } else {
         wifi_util_error_print(WIFI_WEBCONFIG,"%s:%d: Inside ovsdb tables\n", __func__, __LINE__);
-        return(translate_to_ovsdb_tables(type, data));
     }
     wifi_util_error_print(WIFI_WEBCONFIG, "PAVI inside %s %d\n", __func__, __LINE__);
     return webconfig_error_none;
@@ -390,7 +389,6 @@ static webconfig_error_t translate_from_proto(webconfig_subdoc_type_t type, webc
         return(translate_from_easymesh_tables(type, data));
     } else {
         wifi_util_error_print(WIFI_WEBCONFIG,"%s:%d: Inside ovsdb tables\n", __func__, __LINE__);
-        return(translate_from_ovsdb_tables(type, data));
     }
     wifi_util_error_print(WIFI_WEBCONFIG, "PAVI inside %s %d\n", __func__, __LINE__);
     return webconfig_error_none;

@@ -2815,6 +2815,7 @@ typedef struct {
     bool  nstr;
     bool  emlsr;
     bool  emlmr;
+    em_haul_type_t  haul_type;
     unsigned char  num_affiliated_ap;
     em_affiliated_ap_info_t  affiliated_ap[EM_MAX_AP_MLD];
 } em_ap_mld_info_t;
