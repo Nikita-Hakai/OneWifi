@@ -390,7 +390,7 @@ else
 LIBDIRS += -L$(INSTALLDIR)/lib/platform/darwin
 endif
 
-LIBS = -lm -luuid -lwifihal  -lpthread -ldl -ljansson -lev -lssl -lcrypto -lnl-3 -lnl-genl-3 -lnl-route-3 -lavro -lcjson -lprotobuf-c
+LIBS = -lm -luuid -lwifihal  -lpthread -ldl -ljansson -lev -lssl -lcrypto -lnl-3 -lnl-genl-3 -lnl-route-3 -lavro -lcjson -lprotobuf-c -lsyscfg -lulog
 
 #
 # The CXXSOURCES macro contains a list of source files.
@@ -685,7 +685,7 @@ $(HE_BUS_LIBRARY): $(ALL_HEBUS_LIB_OBJECTS)
 
 # PROGRAM links -lwifihal, so libwifihal.a must exist first; naming it as a
 # prerequisite makes `make -j` safe (objects alone don't order the archive).
-$(PROGRAM): $(HAL_LIBRARY) $(ALLOBJECTS)
+$(PROGRAM): $(HAL_LIBRARY) $(ALLOBJECTS) $(UTOPIA_LIBRARIES)
 	$(CXX) -o $@ $(ALLOBJECTS) $(LDFLAGS)
 
 #
